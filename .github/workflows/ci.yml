@@ -40,13 +40,16 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # Exatamente o passo que o README pede, na mesma ordem: o .env precisa existir antes do
+      # pnpm install, porque o `prepare` gera o client Prisma e le a configuracao do banco.
+      - run: cp .env.example .env
+
       - uses: pnpm/setup@v2
         with:
           # A versao vem do campo packageManager do package.json.
           cache: true
-
-      # Exatamente o passo que o README pede: o CI usa o mesmo .env que o ambiente local.
-      - run: cp .env.example .env
+          # O install e um passo explicito logo abaixo, com o lockfile congelado.
+          install: false
 
       - run: pnpm install --frozen-lockfile
 
