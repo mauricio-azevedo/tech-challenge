@@ -60,9 +60,9 @@ Um guard adicional recusa commits diretos em `develop` e branches fora do padrã
 ## Organização do repositório
 
 ```
-apps/        aplicacoes (transactions, anti-fraud, web)
-packages/    codigo compartilhado (contracts, messaging)
-docs/        enunciado original do desafio
+apps/                 aplicacoes (transactions, anti-fraud, web)
+packages/contracts    schemas zod da API e dos eventos, compartilhados por backend e frontend
+docs/                 enunciado original do desafio
 ```
 
 Monorepo com pnpm workspaces e Turborepo — o porquê está em [DECISIONS.md](./DECISIONS.md).
