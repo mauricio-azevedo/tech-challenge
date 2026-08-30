@@ -286,3 +286,24 @@ tabela de eventos _no antifraude_, não uma dependência dele na API de transaç
 síncrono reintroduziria o acoplamento que o enunciado pede para evitar. O limite é configuração
 porque o número muda com o negócio; a regra ("acima de" estrito) é código, com teste nos limites
 (1000 aprova, 1000.01 rejeita).
+
+## Consumo do veredito: update condicional, idempotente por construção
+
+**Decisão:** o serviço de transações aplica `transaction.status.updated` com um único
+`UPDATE … WHERE id = ? AND status = 'PENDING'`. Zero linhas afetadas significa "já era final"
+(entrega repetida) ou "não existe" — os dois casos são logados e a mensagem é confirmada, sem
+retry. Só erro de infraestrutura propaga para a política de retry/DLQ do consumer.
+
+**Alternativas consideradas:** ler-e-então-gravar (`findUnique` + `update`), com ou sem lock;
+tabela de eventos processados (`processed_events` com o `eventId`) para deduplicar; tratar
+"transação desconhecida" como erro e mandar para a DLQ.
+
+**Por quê:** at-least-once significa que a mesma mensagem pode chegar duas vezes (rebalance,
+restart entre o processamento e o commit do offset); com um update condicional, a segunda
+entrega é um no-op sem transação explícita nem lock — a condição _é_ a deduplicação, e serve
+também para o caso de dois vereditos diferentes (o primeiro vence). Uma tabela de eventos
+processados seria necessária se o efeito não fosse naturalmente idempotente (um crédito em
+conta, por exemplo); aqui seria uma tabela a mais para proteger o que a condição já protege.
+"Transação desconhecida" não melhora com retry — com o outbox, a transação é gravada antes de o
+evento existir, então esse cenário indica dado corrompido ou ambiente cruzado, e o lugar dele é o
+log de alerta, não uma fila que ninguém drena.
