@@ -13,6 +13,7 @@ describe('envSchema', () => {
       DATABASE_URL: validEnv.DATABASE_URL,
       KAFKA_BROKERS: ['localhost:9092'],
       KAFKA_CLIENT_ID_TRANSACTIONS: 'transactions',
+      KAFKA_GROUP_ID_TRANSACTIONS: 'transactions-consumer',
       KAFKA_TOPIC_PARTITIONS: 3,
       NODE_ENV: 'development',
       OUTBOX_BATCH_SIZE: 50,

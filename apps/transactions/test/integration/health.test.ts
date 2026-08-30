@@ -18,6 +18,6 @@ describe('GET /health', () => {
     const response = await request(testApp.app.getHttpServer()).get('/health');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ status: 'ok', checks: { database: 'up' } });
+    expect(response.body).toEqual({ status: 'ok', checks: { database: 'up', kafka: 'up' } });
   });
 });

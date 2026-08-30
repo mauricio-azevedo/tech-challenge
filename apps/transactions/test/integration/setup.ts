@@ -7,6 +7,7 @@ import { inject } from 'vitest';
 import { AppModule } from '../../src/app.module.js';
 import { KafkaProducerService } from '../../src/kafka/kafka-producer.service.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
+import { TransactionStatusUpdatedConsumer } from '../../src/transactions/transaction-status-updated.consumer.js';
 import { FakePublisher } from './fake-publisher.js';
 
 export interface TestApp {
@@ -30,6 +31,9 @@ export async function createTestApp(): Promise<TestApp> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(KafkaProducerService)
     .useValue(publisher)
+    // O consumer real assinaria o Kafka no boot; aqui o veredito e aplicado chamando o servico.
+    .overrideProvider(TransactionStatusUpdatedConsumer)
+    .useValue({ isRunning: true })
     .compile();
   const app = moduleRef.createNestApplication<INestApplication<Server>>();
   await app.init();
