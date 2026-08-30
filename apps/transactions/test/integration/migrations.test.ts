@@ -36,11 +36,9 @@ describe('schema de teste', () => {
   });
 
   it('e usado tanto pelas queries do Prisma quanto por SQL cru', async () => {
-    const [{ search_path: searchPath }] = await testApp.prisma.$queryRaw<
-      { search_path: string }[]
-    >`SHOW search_path`;
+    const rows = await testApp.prisma.$queryRaw<{ search_path: string }[]>`SHOW search_path`;
 
-    expect(searchPath).toBe('test');
+    expect(rows[0]?.search_path).toBe('test');
     // Se o SQL cru olhasse para outro schema, esta tabela nao existiria para ele.
     await expect(testApp.prisma.$executeRawUnsafe('SELECT 1 FROM "transactions"')).resolves.toBe(0);
   });
