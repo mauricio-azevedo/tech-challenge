@@ -1,0 +1,40 @@
+{
+  "name": "@challenge/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dashboard de transacoes: listagem, detalhe e criacao, refletindo o veredito antifraude",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@challenge/contracts": "workspace:*",
+    "@tanstack/react-query": "^5.102.8",
+    "next": "16.3.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.6",
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "dotenv": "^17.2.0",
+    "jsdom": "^30.0.1",
+    "msw": "^2.15.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "catalog:",
+    "vite-tsconfig-paths": "catalog:",
+    "vitest": "catalog:"
+  }
+}
