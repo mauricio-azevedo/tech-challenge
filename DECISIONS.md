@@ -144,3 +144,38 @@ padrão continua 5432.
 **Por quê:** máquinas de desenvolvimento frequentemente já têm um PostgreSQL local em 5432 (foi o
 caso aqui). Parametrizar mantém o padrão do desafio para quem não tem conflito e resolve o conflito
 com uma linha no `.env`, em vez de exigir parar um serviço do sistema.
+
+## Listagem: paginação por offset com total, período em dias inclusivos (UTC)
+
+**Decisão:** `GET /transactions` pagina com `page`/`pageSize` (máximo 100) e devolve `total`;
+ordena por `created_at desc, id desc`; o filtro de período recebe `from`/`to` como `AAAA-MM-DD`,
+inclusivos nas duas pontas e interpretados em UTC (`[from 00:00, to + 1 dia 00:00)`).
+
+**Alternativas consideradas:** paginação por cursor (keyset) em `(created_at, id)`; omitir o
+`total` (só `hasNext`); período como timestamps completos; interpretar as datas no fuso do
+usuário.
+
+**Por quê:** o consumidor é um dashboard com páginas numeradas e "N resultados" — offset com
+total é o que essa interface pede, e com os índices compostos o custo é irrelevante no volume
+esperado. Keyset é a evolução natural quando o offset profundo ou o `COUNT(*)` passarem a pesar
+(está na resposta sobre concorrência); o `id` UUID v7 no desempate já deixa a ordenação estável para
+essa migração. Datas em dias são o que um filtro de tela oferece; o intervalo meio-aberto evita o
+erro clássico de perder o último segundo do dia final, e UTC evita que o mesmo filtro devolva
+resultados diferentes conforme o fuso do servidor. Um filtro por hora, se surgisse, seria outro par
+de parâmetros, não uma reinterpretação deste.
+
+## Formato único de erro e tratamento do caminho triste na API
+
+**Decisão:** toda resposta de erro tem a forma `{ statusCode, message, errors? }`. Validação de
+entrada usa os schemas do pacote de contratos diretamente nos decorators do NestJS 12
+(`@Body`/`@Query`/`@Param` com `schema`) e responde 400 com um item por campo (`path`, `message`).
+Um filtro global converte "banco inacessível" em 503 e qualquer exceção inesperada em 500 sem
+detalhes, logando a stack — porque 500 é bug, 503 é infraestrutura.
+
+**Alternativas consideradas:** `ValidationPipe` + `class-validator` (padrão do Nest); deixar o
+formato de erro padrão do framework; devolver a mensagem da exceção desconhecida ao cliente.
+
+**Por quê:** o dashboard precisa mapear erro de validação para o campo do formulário, e isso exige
+`path` estruturado; o formato padrão do Nest devolve uma lista de strings. Distinguir 503 de 500
+muda o que o cliente e a operação fazem: um pede para tentar de novo, o outro abre incidente.
+Detalhes de exceção interna no corpo da resposta vazam estrutura do sistema sem ajudar quem chama.
