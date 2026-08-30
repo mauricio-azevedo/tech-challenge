@@ -1,0 +1,24 @@
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    projects: [
+      {
+        test: {
+          name: 'unit',
+          include: ['src/**/*.test.ts'],
+        },
+      },
+      {
+        // Roda contra o Postgres do docker compose, num schema isolado; ver test/integration/setup.ts.
+        test: {
+          name: 'integration',
+          include: ['test/integration/**/*.test.ts'],
+          globalSetup: ['test/integration/global-setup.ts'],
+          setupFiles: ['test/integration/setup-env.ts'],
+          fileParallelism: false,
+        },
+      },
+    ],
+  },
+});

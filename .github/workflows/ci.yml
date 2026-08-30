@@ -18,6 +18,21 @@ jobs:
     env:
       # Hooks de git nao fazem sentido no CI.
       HUSKY: 0
+    services:
+      # Mesma imagem do docker-compose.yml: os testes de integracao rodam contra um Postgres real.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: challenge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
 
@@ -25,13 +40,16 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # Exatamente o passo que o README pede, na mesma ordem: o .env precisa existir antes do
+      # pnpm install, porque o `prepare` gera o client Prisma e le a configuracao do banco.
+      - run: cp .env.example .env
+
       - uses: pnpm/setup@v2
         with:
           # A versao vem do campo packageManager do package.json.
           cache: true
-
-      # Exatamente o passo que o README pede: o CI usa o mesmo .env que o ambiente local.
-      - run: cp .env.example .env
+          # O install e um passo explicito logo abaixo, com o lockfile congelado.
+          install: false
 
       - run: pnpm install --frozen-lockfile
 
