@@ -180,6 +180,7 @@ packages/contracts    schemas zod da API e dos eventos, compartilhados por backe
 packages/messaging    camada fina sobre o kafkajs: producer, consumer com retry/DLQ, topicos no boot
 scripts/smoke.ts      verificacao ponta a ponta (pnpm smoke)
 docs/desafio.md       enunciado original do desafio
+CLAUDE.md             guia de trabalho no repositorio: fluxo de PR, convencoes, armadilhas conhecidas
 ```
 
 Monorepo com pnpm workspaces e Turborepo; um `.env` na raiz para tudo (`.env.example` documenta
