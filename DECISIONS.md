@@ -399,6 +399,28 @@ os totais, e acoplaria o cache dos cards ao dos filtros. Um endpoint dedicado é
 coberta pelo índice `[status, created_at]`, resposta pequena e cacheável por conta própria, e o
 lugar natural para ganhar `?from&to` se os cards um dia respeitarem o filtro de período.
 
+## Dashboard: shadcn/ui (Radix) sobre Tailwind v4
+
+**Decisão:** o dashboard usa componentes do shadcn/ui — primitivos Radix copiados para
+`apps/web/src/components/ui` pelo CLI — com o tema descrito por tokens CSS em `globals.css`
+mapeando a paleta do design aprovado (zinc, `--radius` de 6px, cores de status, fundo `surface`) e
+a fonte Geist empacotada pelo pacote `geist`. Somente tema claro. O código gerado passa pelo mesmo
+lint e format do repositório.
+
+**Alternativas consideradas:** continuar com Tailwind puro (classes soltas, estado anterior);
+Radix Themes; Base UI; biblioteca fechada (MUI/Chakra).
+
+**Por quê:** o design usa os blocos do shadcn (dialog, sheet, select, toasts) e reproduzi-los à
+mão significa reimplementar foco, `Escape`, `aria-*` e portais — exatamente o que o Radix já faz
+bem e os testes por papel exigem. O shadcn copia o código para dentro do repositório: sem tema em
+runtime, cada componente é editável (overlay, posição do check no select e animações foram
+ajustados ao mockup) e o gate vale para ele como para qualquer arquivo nosso. Radix Themes e MUI
+trazem opinião visual própria que brigaria com a fidelidade ao mockup; Tailwind puro funcionava,
+mas cada overlay novo seria acessibilidade artesanal. A fonte vem empacotada para o build não
+depender de rede; o modo escuro fica de fora por decisão de design — a variante `dark` fica presa
+a uma classe que nunca existe, para os `dark:` do código gerado não dispararem com o tema do
+sistema.
+
 ## Volume alto de escritas e leituras concorrentes: como eu abordaria
 
 > _"A aplicação pode precisar lidar com um volume alto de escritas e leituras concorrentes.
