@@ -52,17 +52,22 @@ Garantias que o desenho dá e que os testes cobrem:
 Pré-requisitos: Node.js 22.23+ (`nvm install` lê o `.nvmrc`), pnpm 11 (fixado em `packageManager`;
 o pnpm 11 se auto-gerencia), Docker com o plugin `compose`.
 
+> **Já existe um PostgreSQL na sua máquina em `localhost:5432`?** É comum em máquinas de
+> desenvolvimento. Os sintomas: o `docker compose up` falha com `address already in use` na porta
+> 5432 e, se você seguir adiante, o `pnpm db:migrate` bate no Postgres errado com
+> "Authentication failed". Logo depois de copiar o `.env`, edite duas linhas nele:
+> `POSTGRES_PORT=5433` e a porta em `DATABASE_URL` (`localhost:5433`). O compose e todos os
+> serviços leem daí.
+
 ```bash
 nvm install                 # Node da versao do .nvmrc
 cp .env.example .env        # variaveis do ambiente local (antes do pnpm install)
-docker compose up -d        # Postgres :5432, Kafka :9092, Kafka UI :8080
+                            # -> porta 5432 ocupada? ajuste POSTGRES_PORT e DATABASE_URL no .env agora
+docker compose up -d        # Postgres :5432 (ou POSTGRES_PORT), Kafka :9092, Kafka UI :8080
 pnpm install                # instala, gera o client Prisma e compila os pacotes internos
 pnpm db:migrate             # aplica as migrations (schema + catalogo de tipos)
 pnpm dev                    # sobe transactions :3001, anti-fraud :3002 e o dashboard :3000
 ```
-
-> Já existe um PostgreSQL em `localhost:5432`? Defina `POSTGRES_PORT=5433` no `.env` (e ajuste a
-> porta em `DATABASE_URL`) antes do `docker compose up`.
 
 | Serviço      | Endereço                              |
 | ------------ | ------------------------------------- |
