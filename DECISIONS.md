@@ -49,3 +49,41 @@ Node 22.14 que já estava instalado.
 plugins do NestJS CLI e o typescript-eslint (que aceita `< 6.1`). O `@nestjs/cli@12` fixa `~6.0.2`.
 O Node 22.14 não atende os requisitos mínimos de `lint-staged@17` (≥ 22.22) nem do
 `@nestjs/schematics` (≥ 22.22.3); 22.23 é a LTS corrente e continua dentro do "Node 22+" do desafio.
+
+## Contratos compartilhados com zod, validando os dois lados da rede
+
+**Decisão:** um pacote `@challenge/contracts` concentra os schemas zod dos corpos da API, das
+respostas e dos eventos. O backend valida requisições com eles, o frontend valida o formulário com
+os mesmos objetos, e os dois serviços validam o que consomem do Kafka com o schema do evento.
+
+**Alternativas consideradas:** `class-validator` + DTOs em classe no NestJS (o padrão do
+framework) e tipos TypeScript duplicados no frontend; OpenAPI como fonte de verdade com geração de
+código para os clientes; JSON Schema.
+
+**Por quê:** a regra de validação de um campo (`value` com duas casas, contas em UUID) existe uma
+única vez e produz a mesma mensagem na tela e na API — o formulário não pode aceitar o que o backend
+recusa nem o contrário. `class-validator` obriga a duplicar essa regra no frontend; OpenAPI com
+geração de código é o caminho certo quando há vários consumidores externos, mas aqui o único
+consumidor é o dashboard do próprio monorepo, e a geração adicionaria um passo de build sem ganho.
+O NestJS 12 aceita qualquer schema _Standard Schema_ nativamente (`@Body({ schema })`), então não
+há adaptador entre o zod e o framework.
+
+## Formato dos eventos: envelope versionado com rastreio
+
+**Decisão:** toda mensagem Kafka carrega um envelope
+`{ eventId, eventType, version, occurredAt, correlationId, causationId?, data }`; o nome do evento
+é o nome do tópico (`transaction.created`, `transaction.status.updated`); a chave da mensagem é o
+`transactionExternalId`; cada tópico tem um `<topico>.dlq`. O payload de `transaction.created`
+carrega os dados necessários à avaliação (valor, contas, tipo); o de `transaction.status.updated`
+carrega o veredito, o motivo e o instante da avaliação.
+
+**Alternativas consideradas:** publicar só o identificador e deixar o consumidor buscar o resto na
+API (evento "magro"); payload sem envelope (só os dados); CloudEvents.
+
+**Por quê:** o antifraude não deve depender da API de transações para avaliar — se dependesse, uma
+indisponibilidade da API travaria a fila e a comunicação deixaria de ser assíncrona de fato. O
+envelope dá idempotência (`eventId`), evolução controlada (`version`), e rastreabilidade
+(`correlationId` liga requisição → evento → veredito → atualização; `causationId` diz qual evento
+gerou qual). CloudEvents traria o mesmo com um vocabulário padronizado, mas exige biblioteca e
+adapta mal ao formato de headers do kafkajs; o envelope próprio tem seis campos e um teste de
+contrato nos dois sentidos. A chave por transação garante ordem por agregado dentro de uma partição.
