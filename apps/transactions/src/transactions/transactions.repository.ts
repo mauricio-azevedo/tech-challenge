@@ -1,4 +1,8 @@
-import type { EventEnvelope, ListTransactionsQuery } from '@challenge/contracts';
+import type {
+  EventEnvelope,
+  FinalTransactionStatus,
+  ListTransactionsQuery,
+} from '@challenge/contracts';
 import { Injectable } from '@nestjs/common';
 
 import type { Prisma } from '../generated/prisma/client.js';
@@ -26,6 +30,8 @@ export interface OutboundEvent {
 }
 
 const withType = { include: { transactionType: true } } as const;
+
+export type StatusUpdateOutcome = 'applied' | 'already-final' | 'not-found';
 
 @Injectable()
 export class TransactionsRepository {
@@ -58,6 +64,24 @@ export class TransactionsRepository {
       });
       return created;
     });
+  }
+
+  /**
+   * Aplica o veredito **so se a transacao ainda esta pendente**: um unico UPDATE condicional, sem
+   * ler antes. E o que torna o consumo idempotente — a mesma mensagem entregue duas vezes muda
+   * o status uma vez. Quem ja e final, ou nao existe, e reportado para que o chamador decida.
+   */
+  async applyFinalStatus(id: string, status: FinalTransactionStatus): Promise<StatusUpdateOutcome> {
+    const { count } = await this.prisma.transaction.updateMany({
+      where: { id, status: 'PENDING' },
+      data: { status },
+    });
+    if (count === 1) return 'applied';
+    const existing = await this.prisma.transaction.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    return existing === null ? 'not-found' : 'already-final';
   }
 
   async findPage(query: ListTransactionsQuery): Promise<TransactionPage> {

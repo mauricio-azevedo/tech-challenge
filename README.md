@@ -96,6 +96,10 @@ O serviço antifraude consome `transaction.created`, aplica a regra (valor acima
 Mensagens que não podem ser processadas (JSON inválido, payload fora do contrato, falha repetida
 do handler) vão para `<tópico>.dlq` com o motivo nos headers; nada trava a fila.
 
+O serviço de transações consome o veredito e atualiza o status com um `UPDATE` condicional
+(`PENDING → APPROVED | REJECTED`): entregas repetidas não têm efeito. `GET /transactions/:id`
+reflete a mudança segundos depois da criação.
+
 ## Convenções
 
 - Branches saem de `develop` com o tipo do commit no nome: `feat/criacao-de-transacao`.
