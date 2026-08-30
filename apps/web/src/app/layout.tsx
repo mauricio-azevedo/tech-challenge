@@ -21,10 +21,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="pt-BR" className={`${GeistSans.variable} ${GeistMono.variable} h-full`}>
       <body>
         <Providers>
-          <AppShell>
-            {/* Largura e respiro do mockup (conteudo alinhado a esquerda, nao centrado). */}
-            <main className="w-full max-w-[1360px] flex-1 px-6 pt-[26px] pb-10">{children}</main>
-          </AppShell>
+          {/* Cada pagina rende seu proprio <main> (e, na listagem, o header fixo da coluna). */}
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>
