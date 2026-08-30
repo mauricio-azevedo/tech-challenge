@@ -19,3 +19,7 @@ allowBuilds:
   # baixa o schema engine usado por `prisma migrate`
   '@prisma/engines': true
   prisma: true
+  # resolvedor nativo usado pelo eslint-config-next
+  unrs-resolver: true
+  # o postinstall do msw so imprime uma mensagem
+  msw: false
