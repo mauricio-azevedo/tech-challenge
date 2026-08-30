@@ -2,6 +2,7 @@ import type {
   CreateTransactionInput,
   PaginatedTransactionsResponse,
   TransactionResponse,
+  TransactionStatsResponse,
   TransactionStatus,
   TransactionTypeResponse,
 } from '@challenge/contracts';
@@ -32,6 +33,10 @@ export function listTransactionTypes(): Promise<TransactionTypeResponse[]> {
   return apiRequest('/transaction-types');
 }
 
+export function getTransactionStats(): Promise<TransactionStatsResponse> {
+  return apiRequest('/transactions/stats');
+}
+
 export function createTransaction(input: CreateTransactionInput): Promise<TransactionResponse> {
   return apiRequest('/transactions', { method: 'POST', body: input });
 }
@@ -41,5 +46,7 @@ export const transactionKeys = {
   all: ['transactions'] as const,
   list: (params: ListTransactionsParams) => ['transactions', 'list', params] as const,
   detail: (id: string) => ['transactions', 'detail', id] as const,
+  // Prefixo 'transactions' de proposito: a invalidacao pos-criacao (keys.all) tambem a alcanca.
+  stats: ['transactions', 'stats'] as const,
   types: ['transaction-types'] as const,
 };

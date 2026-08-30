@@ -5,7 +5,13 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { env } from '@/lib/env';
 
-import { getTransaction, listTransactionTypes, listTransactions, transactionKeys } from './api';
+import {
+  getTransaction,
+  getTransactionStats,
+  listTransactionTypes,
+  listTransactions,
+  transactionKeys,
+} from './api';
 import { toQueryInput, type ListState } from './filters';
 
 export function hasPendingTransaction(
@@ -42,6 +48,19 @@ export function useTransaction(
     queryFn: () => getTransaction(id),
     enabled,
     refetchInterval: (q) => (hasPendingTransaction(q.state.data) ? pollIntervalMs : false),
+  });
+}
+
+/**
+ * Totais para os cards e o contador da sidebar. Mesmo polling condicional da listagem, com um
+ * criterio proprio: enquanto o proprio resumo acusa pendencia (em qualquer pagina, nao so na
+ * visivel), refaz a busca; zero pendente, para.
+ */
+export function useTransactionStats(pollIntervalMs: number = env.pollIntervalMs) {
+  return useQuery({
+    queryKey: transactionKeys.stats,
+    queryFn: getTransactionStats,
+    refetchInterval: (q) => ((q.state.data?.byStatus.PENDING ?? 0) > 0 ? pollIntervalMs : false),
   });
 }
 
