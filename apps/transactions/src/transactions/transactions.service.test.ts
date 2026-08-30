@@ -1,5 +1,6 @@
-import { NotFoundException } from '@nestjs/common';
-import { describe, expect, it } from 'vitest';
+import { transactionCreatedEventSchema } from '@challenge/contracts';
+import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { describe, expect, it, vi } from 'vitest';
 
 import { Prisma } from '../generated/prisma/client.js';
 import type { TransactionWithType } from './transaction.mapper.js';
@@ -46,5 +47,47 @@ describe('TransactionsService', () => {
 
     expect(response).toMatchObject({ page: 3, pageSize: 20, total: 41 });
     expect(response.data).toHaveLength(1);
+  });
+});
+
+describe('TransactionsService.create', () => {
+  const input = {
+    accountExternalIdDebit: '3f2b1d3e-8c4a-4f6e-9a1b-2c3d4e5f6a7b',
+    accountExternalIdCredit: '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d',
+    transferTypeId: 1,
+    value: 120,
+  };
+
+  it('recusa tipo de transferencia desconhecido antes de gravar qualquer coisa', async () => {
+    const createWithOutbox = vi.fn();
+    const service = serviceWith({ typeExists: () => Promise.resolve(false), createWithOutbox });
+
+    await expect(service.create(input, 'req-1')).rejects.toBeInstanceOf(
+      UnprocessableEntityException,
+    );
+    expect(createWithOutbox).not.toHaveBeenCalled();
+  });
+
+  it('grava a transacao junto com um evento transaction.created rastreavel pela requisicao', async () => {
+    const createWithOutbox = vi
+      .fn<TransactionsRepository['createWithOutbox']>()
+      .mockResolvedValue({ ...stored, status: 'PENDING' });
+    const service = serviceWith({ typeExists: () => Promise.resolve(true), createWithOutbox });
+
+    const response = await service.create(input, 'req-1');
+
+    expect(response.transactionStatus).toEqual({ name: 'PENDING' });
+    const [data, event] = createWithOutbox.mock.calls[0] ?? [];
+    expect(data).toEqual({
+      accountExternalIdDebit: input.accountExternalIdDebit,
+      accountExternalIdCredit: input.accountExternalIdCredit,
+      transactionTypeId: 1,
+      value: 120,
+    });
+    expect(event?.topic).toBe('transaction.created');
+    // O evento e construido a partir da linha gravada, como o repositorio real faz.
+    const built = event?.build({ ...stored, status: 'PENDING' });
+    expect(transactionCreatedEventSchema.safeParse(built).success).toBe(true);
+    expect(built?.correlationId).toBe('req-1');
   });
 });

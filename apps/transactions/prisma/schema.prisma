@@ -44,3 +44,24 @@ model Transaction {
   @@index([createdAt(sort: Desc)])
   @@map("transactions")
 }
+
+/// Transactional outbox: o evento e gravado na mesma transacao do dado que o originou e
+/// publicado no Kafka depois, por um relay. Broker fora do ar nao perde evento nem bloqueia a API.
+model OutboxEvent {
+  /// Mesmo valor do `eventId` do envelope: a linha e o evento.
+  id          String    @id @db.Uuid
+  topic       String
+  /// Chave da mensagem Kafka (id da transacao): ordem garantida por agregado.
+  key         String
+  payload     Json
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  claimedAt   DateTime? @map("claimed_at") @db.Timestamptz(6)
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+  failedAt    DateTime? @map("failed_at") @db.Timestamptz(6)
+
+  // O relay le "nao publicados, mais antigos primeiro"; nulos sao indexados no Postgres.
+  @@index([publishedAt, createdAt])
+  @@map("outbox_events")
+}

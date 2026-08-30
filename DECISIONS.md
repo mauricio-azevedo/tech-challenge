@@ -179,3 +179,33 @@ formato de erro padrão do framework; devolver a mensagem da exceção desconhec
 `path` estruturado; o formato padrão do Nest devolve uma lista de strings. Distinguir 503 de 500
 muda o que o cliente e a operação fazem: um pede para tentar de novo, o outro abre incidente.
 Detalhes de exceção interna no corpo da resposta vazam estrutura do sistema sem ajudar quem chama.
+
+## Publicação do evento de criação: transactional outbox
+
+**Decisão:** `POST /transactions` grava a transação **e** o evento `transaction.created` na mesma
+transação de banco (tabela `outbox_events`, `id` = `eventId`, `key` = id da transação, payload =
+envelope completo). Um relay, em processo, lê o outbox e publica no Kafka; a requisição HTTP
+nunca fala com o broker.
+
+**Alternativas consideradas:** publicar no Kafka logo após o commit, dentro da requisição
+(_publish after commit_); publicar antes de gravar; CDC (Debezium lendo o WAL do Postgres).
+
+**Por quê:** as duas primeiras têm uma janela em que a transação existe sem evento (broker fora
+do ar ou processo morto entre o commit e o `send`) ou o evento existe sem transação — e nesse
+domínio "transação pendente para sempre" é exatamente o bug que o fluxo assíncrono não pode ter.
+Com o outbox, a API continua aceitando escritas com o Kafka indisponível e os eventos saem quando
+ele voltar; o custo é uma tabela e um relay. CDC entrega a mesma garantia sem o relay, mas exige
+um componente de infraestrutura (conector, Kafka Connect) que não se justifica antes de o relay
+virar gargalo. O `eventId` como chave primária do outbox torna a gravação idempotente por evento.
+
+## Identificador de requisição como `correlationId`
+
+**Decisão:** um middleware aceita `x-request-id` do cliente ou gera um UUID; o valor volta no
+header da resposta e vira o `correlationId` do evento de criação, que o antifraude propaga para o
+veredito.
+
+**Alternativas consideradas:** não correlacionar; usar o id da transação como correlação.
+
+**Por quê:** com um único identificador dá para seguir uma requisição da API até a atualização de
+status nos logs dos dois serviços. O id da transação serve para o dado, não para a requisição —
+um retry do cliente com o mesmo `x-request-id` fica visível como tal.
