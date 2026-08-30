@@ -4,4 +4,5 @@
  */
 export const env = {
   apiUrl: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001',
+  pollIntervalMs: Number(process.env.NEXT_PUBLIC_POLL_INTERVAL_MS ?? 3000),
 } as const;
