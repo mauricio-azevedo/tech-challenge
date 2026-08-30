@@ -29,7 +29,7 @@ describe('TransactionDetail', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('Carregando transação');
     expect(await screen.findByRole('heading', { name: 'Transação' })).toBeInTheDocument();
-    expect(screen.getByText('rejeitada')).toBeInTheDocument();
+    expect(screen.getByText('Rejeitada')).toBeInTheDocument();
     expect(screen.getByText('R$ 1.500,00')).toBeInTheDocument();
     expect(screen.getByText('TED')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Voltar para a listagem' })).toHaveAttribute(
@@ -58,7 +58,7 @@ describe('TransactionDetail', () => {
       'role',
       'status',
     );
-    await waitFor(() => expect(screen.getByText('aprovada')).toBeInTheDocument(), {
+    await waitFor(() => expect(screen.getByText('Aprovada')).toBeInTheDocument(), {
       timeout: 3000,
     });
     expect(screen.queryByText(/Aguardando a avaliação antifraude/)).not.toBeInTheDocument();
