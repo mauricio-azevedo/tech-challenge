@@ -28,6 +28,8 @@ export default defineConfig([
     rules: {
       // "any" e sinal de que o tipo ainda nao foi entendido (PRACTICES.md).
       '@typescript-eslint/no-explicit-any': 'error',
+      // Modulos do NestJS sao classes vazias que existem pelo decorator.
+      '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true }],
       '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
       '@typescript-eslint/no-unused-vars': [
         'error',
