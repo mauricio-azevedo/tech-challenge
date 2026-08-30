@@ -12,13 +12,14 @@
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "db:generate": "turbo run db:generate",
     "db:migrate": "pnpm --filter @challenge/transactions db:migrate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "quality": "pnpm lint && pnpm format:check && turbo run typecheck test build",
-    "prepare": "husky"
+    "quality": "pnpm db:generate && pnpm lint && pnpm format:check && turbo run typecheck test build",
+    "prepare": "husky && turbo run db:generate"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
