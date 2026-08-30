@@ -101,6 +101,13 @@ O serviço de transações consome o veredito e atualiza o status com um `UPDATE
 (`PENDING → APPROVED | REJECTED`): entregas repetidas não têm efeito. `GET /transactions/:id`
 reflete a mudança segundos depois da criação.
 
+## Dashboard
+
+Em http://localhost:3000: listagem paginada com filtros por status, tipo e período (o estado
+fica na URL), detalhe e criação de transação. Enquanto houver transação `pendente` na tela, o
+dashboard consulta a API a cada `NEXT_PUBLIC_POLL_INTERVAL_MS` (3s) e para quando tudo é final —
+é assim que o veredito do antifraude aparece sem recarregar a página.
+
 ## Convenções
 
 - Branches saem de `develop` com o tipo do commit no nome: `feat/criacao-de-transacao`.
