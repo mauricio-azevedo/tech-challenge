@@ -6,6 +6,7 @@ import { inject } from 'vitest';
 
 import { AppModule } from '../../src/app.module.js';
 import { KafkaProducerService } from '../../src/kafka/kafka-producer.service.js';
+import { OutboxRelay } from '../../src/outbox/outbox-relay.service.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
 import { TransactionStatusUpdatedConsumer } from '../../src/transactions/transaction-status-updated.consumer.js';
 import { FakePublisher } from './fake-publisher.js';
@@ -37,6 +38,8 @@ export async function createTestApp(): Promise<TestApp> {
     .compile();
   const app = moduleRef.createNestApplication<INestApplication<Server>>();
   await app.init();
+  // O relay publicaria em segundo plano e disputaria os eventos com os `flush()` dos testes.
+  await app.get(OutboxRelay).stop();
 
   return { app, prisma: app.get(PrismaService), publisher, close: () => app.close() };
 }

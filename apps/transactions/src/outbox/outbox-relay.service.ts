@@ -48,7 +48,15 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
     this.schedule();
   }
 
-  async onModuleDestroy(): Promise<void> {
+  onModuleDestroy(): Promise<void> {
+    return this.stop();
+  }
+
+  /**
+   * Para o ciclo em segundo plano e espera o que estiver em voo. Alem do shutdown, e usado pelos
+   * testes de integracao, que disparam `flush()` na mao e nao podem disputar eventos com o timer.
+   */
+  async stop(): Promise<void> {
     this.stopped = true;
     if (this.timer !== undefined) clearTimeout(this.timer);
     await this.inFlight;
