@@ -11,7 +11,7 @@ catalog:
   '@vitest/coverage-v8': ^4.1.11
   vite-tsconfig-paths: ^6.1.1
   zod: ^4.5.0
-  tsx: ^4.23.13
+  tsx: ~4.23.12
 
 # pnpm bloqueia scripts de instalacao de dependencias por padrao; entradas em allowBuilds liberam
 # apenas o que precisa compilar ou baixar binarios (pnpm approve-builds).
@@ -23,3 +23,5 @@ allowBuilds:
   unrs-resolver: true
   # o postinstall do msw so imprime uma mensagem
   msw: false
+  # binario nativo usado pelo tsx (scripts/smoke.ts)
+  esbuild: true
