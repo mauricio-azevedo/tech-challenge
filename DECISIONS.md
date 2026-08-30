@@ -381,3 +381,85 @@ Mudar um filtro volta para a página 1.
 **Por quê:** a URL é compartilhável, o botão voltar funciona e recarregar preserva o que o
 usuário estava vendo — de graça, sem store. Um valor inválido na URL é ignorado campo a campo em
 vez de quebrar a tela. A página N de um filtro não significa nada em outro filtro.
+
+## Volume alto de escritas e leituras concorrentes: como eu abordaria
+
+> _"A aplicação pode precisar lidar com um volume alto de escritas e leituras concorrentes.
+> Como você abordaria esse requisito?"_
+
+Antes de qualquer otimização: **medir**. Três números dizem onde dói — p95 de latência por
+endpoint, _lag_ do consumer por partição e tamanho do backlog do outbox (`published_at IS NULL`).
+Sem eles, "escalar" é chute. O que segue está em ordem de custo, e ancorado nos três caminhos que
+este sistema tem.
+
+### O que já está desenhado para concorrência
+
+- **Criação** é um `INSERT` append-only mais uma linha de outbox, na mesma transação: não há linha
+  disputada, logo não há lock de negócio. O `id` é UUID v7, ordenável no tempo — inserts caem no
+  fim do índice primário em vez de fragmentá-lo como um v4 faria.
+- **Atualização de status** é um único `UPDATE` condicional por chave primária, uma vez por
+  transação. Duas entregas do mesmo veredito não competem: a segunda não afeta linha nenhuma.
+- **Leitura da listagem** tem índices compostos exatamente nos filtros
+  (`(status, created_at)`, `(transaction_type_id, created_at)`, `(created_at)`), e a API é
+  stateless — N instâncias atrás de um balanceador sem nenhuma mudança de código.
+- **Kafka** particionado pela chave da transação: paralelismo entre transações, ordem dentro de
+  cada uma. Consumers idempotentes tornam o _at-least-once_ seguro.
+- **Relay do outbox** já usa `FOR UPDATE SKIP LOCKED`: várias instâncias da API publicam lotes
+  disjuntos sem coordenação.
+
+### Escritas
+
+1. **Conexões, antes de CPU.** O primeiro limite de escrita em Postgres com Node costuma ser
+   `max_connections`: pool do Prisma × instâncias da API × relays. A resposta é **PgBouncer em
+   modo transação** na frente do banco (com o cuidado de desligar _prepared statements_ no
+   cliente), não um banco maior.
+2. **Retries do cliente geram duplicatas.** Sob carga, timeouts fazem clientes repetir o `POST`.
+   Uma chave de idempotência (`Idempotency-Key` no header, `UNIQUE` no banco, resposta anterior
+   devolvida) transforma o retry em no-op. É a primeira coisa que eu adicionaria ao contrato.
+3. **Relay como gargalo.** Se o backlog do outbox crescer, os passos são: aumentar o lote, rodar
+   mais relays (o `SKIP LOCKED` já permite) e, só então, trocar o polling por CDC (Debezium lendo
+   o WAL) — que elimina o polling mas traz Kafka Connect como componente. Expurgar linhas
+   publicadas (retenção de dias) mantém o índice parcial pequeno.
+4. **Producer**: `acks=all` já está; producer idempotente e `linger.ms`/lotes maiores trocam
+   latência por throughput quando o volume justificar.
+
+### Leituras
+
+1. **Réplicas de leitura** para a listagem, com um cuidado: o detalhe de uma transação
+   recém-criada precisa ler do primário (_read-your-writes_), senão o usuário cria e "não
+   encontra". Rotear por endpoint resolve.
+2. **Paginação por cursor** (`created_at, id` — o desempate estável já existe) no lugar do
+   `OFFSET`, que degrada linearmente com a profundidade; e substituir o `COUNT(*)` exato por
+   "há próxima página" ou uma contagem aproximada/cacheada — em tabelas grandes o `COUNT` custa
+   mais do que a página.
+3. **Cache** só onde não mente: o catálogo de tipos. O status de uma transação pendente exige
+   frescor; cachear a listagem esconderia exatamente a mudança que o dashboard existe para mostrar.
+4. **Tempestade de polling.** O custo do polling é `abas abertas × pendentes na tela`. O primeiro
+   passo barato é um endpoint delta (`?updatedSince=`); o segundo é **SSE** alimentado pelo
+   consumer de `transaction.status.updated`, com fan-out por instância (cada instância consome o
+   tópico com seu próprio grupo, ou via pub/sub). O ponto de troca é um hook no frontend.
+
+### Kafka e consumidores
+
+- Partições são o teto de paralelismo: `consumers ≤ partições`. O número de partições é decidido
+  cedo (aumentar depois quebra a ordem por chave), então eu o dimensionaria pelo pico esperado com
+  folga.
+- O _lag_ por partição é o sinal para escalar o antifraude, que é stateless e escala sem mais nada.
+- A política de retry em processo (backoff curto, DLQ) preserva a ordem por partição; se um
+  handler passar a demorar, o próximo passo é um tópico de retry com atraso, para não travar a
+  partição.
+
+### Dados que crescem
+
+- Particionar `transactions` por `created_at` faz sentido **se houver política de retenção**
+  (arquivar meses antigos); sem retenção, só complica.
+- `outbox_events` publicados são descartáveis: expurgo periódico.
+
+### O que eu não faria
+
+- Tornar o antifraude síncrono para "simplificar": acopla a disponibilidade dos dois serviços e é
+  o oposto do que o fluxo pede.
+- Locks distribuídos ou uma tabela de "eventos processados" para deduplicar: a condição do
+  `UPDATE` já resolve para este efeito.
+- CQRS com leitura em outro banco, antes de réplicas e índices esgotarem: é o dobro de
+  infraestrutura para um problema que ainda não existe.
