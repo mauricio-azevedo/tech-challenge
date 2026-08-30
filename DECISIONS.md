@@ -87,3 +87,60 @@ envelope dá idempotência (`eventId`), evolução controlada (`version`), e ras
 gerou qual). CloudEvents traria o mesmo com um vocabulário padronizado, mas exige biblioteca e
 adapta mal ao formato de headers do kafkajs; o envelope próprio tem seis campos e um teste de
 contrato nos dois sentidos. A chave por transação garante ordem por agregado dentro de uma partição.
+
+## Modelagem de dados
+
+**Decisão:** duas tabelas de negócio no Postgres, via Prisma com migrations versionadas:
+`transaction_types` (catálogo, semeado pela própria migration) e `transactions` (`id` UUID v7 que
+**é** o `transactionExternalId` do contrato, contas, tipo, `status` como enum Postgres, `value`
+como `numeric(15,2)`, `created_at`/`updated_at`). Índices compostos `(status, created_at desc)`,
+`(transaction_type_id, created_at desc)` e `(created_at desc)`, que são exatamente os filtros e a
+ordenação da listagem.
+
+**Alternativas consideradas:** status em tabela de lookup (como a forma `{ name }` do contrato
+sugere); `value` como ponto flutuante ou como inteiro em centavos; UUID v4 (`gen_random_uuid()`);
+`id` interno numérico + `external_id` separado; seed via script (`prisma db seed`).
+
+**Por quê:** o enum é validado pelo banco, tipado pelo Prisma e só tem três valores estáveis; uma
+tabela de lookup custaria um join em toda leitura para expressar o mesmo. O contrato devolve
+`transactionStatus.name`, e o mapper produz essa forma a partir do enum. Dinheiro em
+ponto flutuante é erro de arredondamento garantido; `numeric(15,2)` é exato, e o mapper converte para
+número só na borda da API (o contrato mostra `120`, não `"120.00"`). Centavos inteiros seriam
+igualmente corretos, mas tornariam todo `value` do código um `bigint` a converter. UUID v7 é ordenável
+no tempo: numa tabela append-only, v4 fragmenta o índice primário a cada insert. Um único `id`
+externo evita expor sequência e dispensa um índice extra. O seed na migration garante que
+qualquer ambiente que aplicou as migrations tem o mesmo catálogo — inclusive o CI e os testes —
+sem um passo manual que alguém esquece. O que mudaria: se surgissem novos status com frequência,
+`ALTER TYPE … ADD VALUE` não roda dentro de transação de migration, e a lookup table passaria a
+valer a pena.
+
+## Estratégia de testes: unitários com fakes, integração com Postgres real, tudo no gate
+
+**Decisão:** Vitest em todos os pacotes, com dois projetos no serviço de transações: `unit`
+(regras e mapeamentos, sem I/O) e `integration` (a aplicação inteira contra o Postgres do docker
+compose, num schema isolado `test`, migrations aplicadas por um `globalSetup`). Os dois rodam em
+`pnpm test` e, portanto, no `pnpm quality` e no CI — que sobe um Postgres como _service container_.
+
+**Alternativas consideradas:** mockar o Prisma nos testes de repositório; Testcontainers para
+subir o banco dentro do próprio teste; deixar a integração fora do gate (só manual ou num job
+separado).
+
+**Por quê:** filtros, paginação e o update condicional de status _são_ as regras de negócio do
+serviço e vivem em SQL — testá-los contra um mock do Prisma testa o mock. O compose já é passo um do
+README, então exigir o banco no gate não adiciona pré-requisito; o `globalSetup` falha rápido com a
+instrução de subir o compose quando o banco não responde. Testcontainers daria um `pnpm test`
+autossuficiente ao custo de mais uma dependência pesada e de segundos de subida por execução; o
+schema isolado protege os dados de desenvolvimento com custo zero. Os testes consultam a aplicação
+pela borda (HTTP, banco), não pela implementação — é o que faz um teste quebrar quando o
+comportamento quebra.
+
+## Porta do Postgres parametrizada no docker-compose
+
+**Decisão:** o mapeamento de porta do Postgres passa a ser `${POSTGRES_PORT:-5432}:5432`; o
+padrão continua 5432.
+
+**Alternativas consideradas:** manter fixo em 5432; trocar para uma porta "exótica" fixa.
+
+**Por quê:** máquinas de desenvolvimento frequentemente já têm um PostgreSQL local em 5432 (foi o
+caso aqui). Parametrizar mantém o padrão do desafio para quem não tem conflito e resolve o conflito
+com uma linha no `.env`, em vez de exigir parar um serviço do sistema.
