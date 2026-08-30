@@ -1,8 +1,8 @@
-import { transactionResponseSchema } from '@challenge/contracts';
+import { transactionResponseSchema, transactionStatsResponseSchema } from '@challenge/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { Prisma } from '../generated/prisma/client.js';
-import { toTransactionResponse } from './transaction.mapper.js';
+import { toTransactionResponse, toTransactionStatsResponse } from './transaction.mapper.js';
 
 describe('toTransactionResponse', () => {
   it('produz o contrato da API, com o valor como numero e datas em ISO', () => {
@@ -29,5 +29,29 @@ describe('toTransactionResponse', () => {
       updatedAt: '2026-08-30T12:00:00.000Z',
     });
     expect(transactionResponseSchema.safeParse(response).success).toBe(true);
+  });
+});
+
+describe('toTransactionStatsResponse', () => {
+  it('zera os status ausentes e converte o volume aprovado para numero', () => {
+    const response = toTransactionStatsResponse([
+      { status: 'APPROVED', count: 2, sum: new Prisma.Decimal('1000.50') },
+      { status: 'PENDING', count: 1, sum: new Prisma.Decimal('35.00') },
+    ]);
+
+    expect(response).toEqual({
+      total: 3,
+      byStatus: { PENDING: 1, APPROVED: 2, REJECTED: 0 },
+      approvedVolume: 1000.5,
+    });
+    expect(transactionStatsResponseSchema.safeParse(response).success).toBe(true);
+  });
+
+  it('responde tudo zerado para um banco vazio', () => {
+    expect(toTransactionStatsResponse([])).toEqual({
+      total: 0,
+      byStatus: { PENDING: 0, APPROVED: 0, REJECTED: 0 },
+      approvedVolume: 0,
+    });
   });
 });

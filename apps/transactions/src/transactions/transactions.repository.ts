@@ -9,7 +9,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { OutboxRepository } from '../outbox/outbox.repository.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toCreatedAtRange } from './period.js';
-import type { TransactionWithType } from './transaction.mapper.js';
+import type { StatusTotals, TransactionWithType } from './transaction.mapper.js';
 
 export interface TransactionPage {
   items: TransactionWithType[];
@@ -82,6 +82,16 @@ export class TransactionsRepository {
       select: { id: true },
     });
     return existing === null ? 'not-found' : 'already-final';
+  }
+
+  /** Contagem e soma por status num unico GROUP BY; o indice `[status, created_at]` cobre a busca. */
+  async countByStatus(): Promise<StatusTotals[]> {
+    const rows = await this.prisma.transaction.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+      _sum: { value: true },
+    });
+    return rows.map((row) => ({ status: row.status, count: row._count._all, sum: row._sum.value }));
   }
 
   async findPage(query: ListTransactionsQuery): Promise<TransactionPage> {

@@ -382,6 +382,23 @@ Mudar um filtro volta para a página 1.
 usuário estava vendo — de graça, sem store. Um valor inválido na URL é ignorado campo a campo em
 vez de quebrar a tela. A página N de um filtro não significa nada em outro filtro.
 
+## Estatísticas da listagem: endpoint próprio em vez de agregação no cliente
+
+**Decisão:** os cards de resumo do dashboard (total, aprovadas, rejeitadas, pendentes e volume
+aprovado) vêm de `GET /transactions/stats`, um `GROUP BY status` com contagem e soma no banco,
+devolvido no contrato `transactionStatsResponseSchema` com os três status sempre presentes
+(zerados quando não há linhas). Sem filtros por enquanto: os números falam do período inteiro.
+
+**Alternativas consideradas:** somar a página atual no cliente; buscar todas as páginas
+(`pageSize=100` em série) e agregar; devolver os totais junto da resposta da listagem.
+
+**Por quê:** a página atual enxerga no máximo `pageSize` itens — qualquer agregação em cima dela
+mente quando existe mais de uma página. Buscar tudo transfere o custo da agregação para a rede e
+cresce com a tabela. Embutir na listagem faria todo consumidor pagar o `GROUP BY` mesmo sem usar
+os totais, e acoplaria o cache dos cards ao dos filtros. Um endpoint dedicado é uma consulta
+coberta pelo índice `[status, created_at]`, resposta pequena e cacheável por conta própria, e o
+lugar natural para ganhar `?from&to` se os cards um dia respeitarem o filtro de período.
+
 ## Volume alto de escritas e leituras concorrentes: como eu abordaria
 
 > _"A aplicação pode precisar lidar com um volume alto de escritas e leituras concorrentes.

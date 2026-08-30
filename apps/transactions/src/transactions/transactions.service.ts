@@ -4,11 +4,12 @@ import {
   type ListTransactionsQuery,
   type PaginatedTransactionsResponse,
   type TransactionResponse,
+  type TransactionStatsResponse,
 } from '@challenge/contracts';
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 
 import { buildTransactionCreatedEvent } from './transaction-created.event.js';
-import { toTransactionResponse } from './transaction.mapper.js';
+import { toTransactionResponse, toTransactionStatsResponse } from './transaction.mapper.js';
 import { TransactionsRepository } from './transactions.repository.js';
 
 @Injectable()
@@ -48,6 +49,10 @@ export class TransactionsService {
       throw new NotFoundException(`transacao ${transactionExternalId} nao encontrada`);
     }
     return toTransactionResponse(transaction);
+  }
+
+  async stats(): Promise<TransactionStatsResponse> {
+    return toTransactionStatsResponse(await this.repository.countByStatus());
   }
 
   async list(query: ListTransactionsQuery): Promise<PaginatedTransactionsResponse> {

@@ -154,6 +154,7 @@ publique um texto que não é JSON em `transaction.created` pelo Kafka UI; ele a
 | `POST` | `/transactions`                        | cria (`201`, status `PENDING`); `400` com `errors[{ path, message }]`; `422` se o tipo não existe                   |
 | `GET`  | `/transactions/:transactionExternalId` | detalhe (`404` se não existe; `400` se não é UUID)                                                                  |
 | `GET`  | `/transactions`                        | lista paginada: `status`, `transferTypeId`, `from`/`to` (`AAAA-MM-DD`, inclusivos, UTC), `page`, `pageSize` (≤ 100) |
+| `GET`  | `/transactions/stats`                  | totais por status e volume aprovado (sem filtros); alimenta os cards e o contador do dashboard                      |
 | `GET`  | `/transaction-types`                   | catálogo de tipos (semeado pela migration: TED, PIX, DOC)                                                           |
 | `GET`  | `/health`                              | readiness (`database`, `kafka`)                                                                                     |
 
