@@ -6,9 +6,18 @@ import type { Env } from '../config/env.schema.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { splitDatabaseUrl } from './database-url.js';
 
+/**
+ * O `schema` passado ao adapter so vale para as queries que o Prisma compila; SQL cru
+ * (`$queryRaw`, `$executeRaw`) segue o `search_path` da conexao. Definimos os dois para que
+ * tabela "transactions" signifique a mesma coisa nos dois caminhos — e nos testes, que usam um
+ * schema isolado, isso e a diferenca entre limpar a tabela certa e a errada.
+ */
 function createAdapter(databaseUrl: string): PrismaPg {
   const { connectionString, schema } = splitDatabaseUrl(databaseUrl);
-  return new PrismaPg({ connectionString }, schema === undefined ? {} : { schema });
+  if (schema === undefined) {
+    return new PrismaPg({ connectionString });
+  }
+  return new PrismaPg({ connectionString, options: `-c search_path=${schema}` }, { schema });
 }
 
 @Injectable()

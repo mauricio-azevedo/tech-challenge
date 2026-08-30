@@ -17,3 +17,11 @@ describe('splitDatabaseUrl', () => {
     });
   });
 });
+
+describe('splitDatabaseUrl: schema vai para um parametro de conexao', () => {
+  it('recusa nomes de schema que nao sejam identificadores simples', () => {
+    expect(() => splitDatabaseUrl('postgresql://localhost/db?schema=test;drop')).toThrow(
+      /schema invalido/,
+    );
+  });
+});
