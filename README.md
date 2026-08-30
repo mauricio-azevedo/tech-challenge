@@ -49,14 +49,14 @@ pnpm quality
 
 Cada etapa também roda isolada, para o ciclo curto do dia a dia:
 
-| Comando             | O que faz                                                     |
-| ------------------- | ------------------------------------------------------------- |
-| `pnpm db:generate`  | gera o client Prisma (roda no `pnpm install` e antes do lint) |
-| `pnpm lint`         | ESLint (regras com checagem de tipos) em todo o repo          |
-| `pnpm format:check` | Prettier em modo verificação (`pnpm format` corrige)          |
-| `pnpm typecheck`    | `tsc --noEmit` em cada pacote                                 |
-| `pnpm test`         | Vitest em cada pacote                                         |
-| `pnpm build`        | build de cada pacote, na ordem do grafo                       |
+| Comando             | O que faz                                                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm bootstrap`    | gera o client Prisma e compila os pacotes internos (`packages/*`); roda no `pnpm install` e antes do lint, porque o ESLint com checagem de tipos precisa deles |
+| `pnpm lint`         | ESLint (regras com checagem de tipos) em todo o repo                                                                                                           |
+| `pnpm format:check` | Prettier em modo verificação (`pnpm format` corrige)                                                                                                           |
+| `pnpm typecheck`    | `tsc --noEmit` em cada pacote                                                                                                                                  |
+| `pnpm test`         | Vitest em cada pacote                                                                                                                                          |
+| `pnpm build`        | build de cada pacote, na ordem do grafo                                                                                                                        |
 
 Antes de cada commit, `lint-staged` roda ESLint e Prettier apenas nos arquivos alterados, e o
 `commitlint` recusa mensagens fora do padrão [Conventional Commits](https://www.conventionalcommits.org/pt-br/v1.0.0/).
