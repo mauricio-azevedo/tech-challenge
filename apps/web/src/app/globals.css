@@ -1,15 +1,113 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
-@theme {
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+/* Sem modo escuro: a variante fica atrelada a uma classe que nunca existe, para os `dark:` dos
+   componentes gerados nao dispararem com o tema do sistema operacional. */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* As fontes Geist entram como variaveis no <html> (pacote `geist`); inline para resolver la. */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-sans);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  /* Fundo "um tom acima" do mockup: sidebar, header da tabela, tiles do detalhe, hover de linha. */
+  --color-surface: var(--surface);
+
+  /* Cores de status do mockup (dot / fundo / texto / borda). */
+  --color-status-pending: #f59e0b;
+  --color-status-pending-bg: #fffbeb;
+  --color-status-pending-fg: #b45309;
+  --color-status-pending-border: #fde68a;
+  --color-status-approved: #22c55e;
+  --color-status-approved-bg: #f0fdf4;
+  --color-status-approved-fg: #15803d;
+  --color-status-approved-border: #bbf7d0;
+  --color-status-rejected: #ef4444;
+  --color-status-rejected-bg: #fef2f2;
+  --color-status-rejected-fg: #b91c1c;
+  --color-status-rejected-border: #fecaca;
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 6px);
+
+  --animate-shimmer: shimmer 1.5s ease-in-out infinite;
+  --animate-row-flash: row-flash 1.4s ease-out;
+
+  @keyframes shimmer {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+  @keyframes row-flash {
+    from {
+      background-color: #fafaf9;
+    }
+    to {
+      background-color: transparent;
+    }
+  }
 }
 
 :root {
   color-scheme: light;
+  --background: #ffffff;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #ef4444;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #a1a1aa;
+  --surface: #fafafa;
+  --radius: 6px;
 }
 
-body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    /* Base de 14px do mockup. */
+    @apply bg-background text-sm text-foreground antialiased;
+  }
 }
