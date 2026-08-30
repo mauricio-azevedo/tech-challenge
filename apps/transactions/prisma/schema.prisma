@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Ciclo de vida de uma transacao: nasce PENDING e termina em APPROVED ou REJECTED.
+enum TransactionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("transaction_status")
+}
+
+/// Tipos de transferencia aceitos (`transferTypeId` no contrato). Semeados pela migration.
+model TransactionType {
+  id           Int           @id @db.SmallInt
+  name         String        @unique
+  transactions Transaction[]
+
+  @@map("transaction_types")
+}
+
+model Transaction {
+  /// UUID v7: ordenavel no tempo, evita a fragmentacao de indice do v4 em tabelas append-only.
+  id                      String            @id @default(uuid(7)) @db.Uuid
+  accountExternalIdDebit  String            @map("account_external_id_debit") @db.Uuid
+  accountExternalIdCredit String            @map("account_external_id_credit") @db.Uuid
+  transactionTypeId       Int               @map("transaction_type_id") @db.SmallInt
+  transactionType         TransactionType   @relation(fields: [transactionTypeId], references: [id])
+  status                  TransactionStatus @default(PENDING)
+  /// Dinheiro e decimal exato, nunca ponto flutuante.
+  value                   Decimal           @db.Decimal(15, 2)
+  createdAt               DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Indices cobrindo os filtros da listagem, sempre ordenada por data decrescente.
+  @@index([status, createdAt(sort: Desc)])
+  @@index([transactionTypeId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("transactions")
+}

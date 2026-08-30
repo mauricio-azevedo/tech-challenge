@@ -15,3 +15,7 @@ catalog:
 
 # pnpm bloqueia scripts de instalacao de dependencias por padrao; entradas em allowBuilds liberam
 # apenas o que precisa compilar ou baixar binarios (pnpm approve-builds).
+allowBuilds:
+  # baixa o schema engine usado por `prisma migrate`
+  '@prisma/engines': true
+  prisma: true
