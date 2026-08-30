@@ -28,3 +28,9 @@ pnpm-debug.log*
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# turborepo
+.turbo/
+
+# prisma client gerado
+**/src/generated/
