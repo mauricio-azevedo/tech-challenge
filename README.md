@@ -39,6 +39,24 @@ pnpm dev               # sobe as aplicacoes em modo watch
 | Kafka        | `localhost:9092`                      |
 | Kafka UI     | http://localhost:8080                 |
 
+## Verificação ponta a ponta
+
+Com a infraestrutura e as três aplicações de pé (`docker compose up -d` e `pnpm dev`):
+
+```bash
+pnpm smoke
+```
+
+O script cria transações de 120, 1500 e 1000 e espera o veredito do antifraude chegar ao status
+(`APPROVED`, `REJECTED`, `APPROVED`), passando por Postgres, outbox, Kafka e os dois serviços. Ele
+fica fora do quality gate de propósito: exige a stack inteira.
+
+Para ver a resiliência à queda do broker, à mão: `docker compose stop kafka`, crie uma transação
+(a API responde 201 e a linha fica em `outbox_events` com `attempts` subindo), `docker compose
+start kafka` — o evento sai sozinho e o status é atualizado. Para ver a DLQ: publique um texto que
+não é JSON em `transaction.created` pelo Kafka UI; ele aparece em `transaction.created.dlq` com o
+motivo nos headers e o consumidor segue vivo.
+
 ## Quality gate
 
 Um único comando roda tudo que valida o projeto — é o mesmo que a integração contínua executa:
