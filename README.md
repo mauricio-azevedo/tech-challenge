@@ -76,10 +76,19 @@ Um guard adicional recusa commits diretos em `develop` e branches fora do padrã
 ```
 apps/transactions     API NestJS de transacoes (Prisma + Postgres); migrations em prisma/migrations
 packages/contracts    schemas zod da API e dos eventos, compartilhados por backend e frontend
+packages/messaging    camada fina sobre o kafkajs: producer, consumer com retry/DLQ, topicos no boot
 docs/                 enunciado original do desafio
 ```
 
 Monorepo com pnpm workspaces e Turborepo — o porquê está em [DECISIONS.md](./DECISIONS.md).
+
+## Como o evento de criação chega ao Kafka
+
+`POST /transactions` grava a transação (`PENDING`) e o evento `transaction.created` na mesma
+transação de banco (tabela `outbox_events`). Um relay dentro do serviço publica os eventos
+pendentes no Kafka a cada `OUTBOX_POLL_INTERVAL_MS`; com o broker fora do ar a API continua
+aceitando escritas e os eventos saem quando ele voltar. Os tópicos (e suas DLQs) são criados no
+boot do serviço. Para ver as mensagens: Kafka UI em http://localhost:8080.
 
 ## Convenções
 
