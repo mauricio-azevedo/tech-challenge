@@ -421,6 +421,27 @@ depender de rede; o modo escuro fica de fora por decisão de design — a varian
 a uma classe que nunca existe, para os `dark:` do código gerado não dispararem com o tema do
 sistema.
 
+## Detalhe em sheet e criação em dialog, com deep link
+
+**Decisão:** o detalhe abre num sheet lateral e a criação num dialog, por cima da listagem — mas
+as rotas `/transactions/:id` e `/transactions/new` continuam existindo: renderizam a listagem com
+o overlay aberto, e fechar navega de volta com a query preservada. O toast de veredito é um
+assinante único do cache do TanStack Query, montado em `Providers`: ids `PENDING` entram num
+conjunto e a primeira reaparição com status final gera exatamente um toast, venha da listagem, do
+detalhe ou da criação.
+
+**Alternativas consideradas:** páginas separadas para detalhe e criação (estado anterior);
+overlay só em estado local, sem URL; intercepting/parallel routes do App Router; toast disparado
+por cada tela que observa a transação.
+
+**Por quê:** o design pede a lista viva por baixo do detalhe — linha piscando, cards e contador
+atualizando enquanto se lê o veredito — e URLs compartilháveis já eram um requisito entregue;
+abrir mão delas seria regressão. Manter a URL como única fonte de verdade também para os overlays
+reaproveita a decisão dos filtros: voltar fecha o sheet, recarregar reabre no mesmo lugar.
+Intercepting routes fariam o mesmo com mais estrutura (rotas paralelas por overlay) e sem ganho
+aqui. O toast assinando o cache — e não as telas — evita o toast em dobro quando listagem e
+detalhe observam a mesma transação, e sobrevive à troca de rota porque vive acima das páginas.
+
 ## Volume alto de escritas e leituras concorrentes: como eu abordaria
 
 > _"A aplicação pode precisar lidar com um volume alto de escritas e leituras concorrentes.

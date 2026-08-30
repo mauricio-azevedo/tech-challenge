@@ -20,22 +20,23 @@ em português só na tela.
 
 ## Mapa do repositório
 
-| Caminho                               | Responsabilidade                                                                       |
-| ------------------------------------- | -------------------------------------------------------------------------------------- |
-| `apps/transactions/src/transactions/` | endpoints, repositório Prisma, mapper para o contrato, consumer do veredito            |
-| `apps/transactions/src/outbox/`       | outbox transacional (`enqueue` na transação de quem chama) e relay que publica         |
-| `apps/transactions/src/kafka/`        | cliente kafkajs, producer com criação de tópicos no boot                               |
-| `apps/transactions/src/common/`       | pipe de validação (schemas zod), filtro global de erro, `x-request-id`                 |
-| `apps/transactions/prisma/`           | `schema.prisma` e migrations versionadas (o catálogo de tipos é semeado por migration) |
-| `apps/transactions/test/integration/` | app inteira contra o Postgres do compose, schema `test`, Kafka substituído por fakes   |
-| `apps/anti-fraud/src/anti-fraud/`     | regra pura (`fraud-policy.ts`), handler que publica o veredito, consumer               |
-| `apps/web/src/features/transactions/` | API client, filtros na URL, hooks com polling condicional, telas                       |
-| `apps/web/src/components/ui/`         | estados de tela (carregando / erro / vazio), badge de status, paginação                |
-| `apps/web/test/`                      | setup do MSW, fixtures, `renderWithQuery`                                              |
-| `packages/contracts/src/`             | schemas zod da API e dos eventos, tópicos, fábrica `createEvent`                       |
-| `packages/messaging/src/`             | producer, `runConsumer` (validação → retry com backoff → DLQ), `ensureTopics`          |
-| `scripts/smoke.ts`                    | verificação ponta a ponta contra a stack real (`pnpm smoke`)                           |
-| `docs/desafio.md`                     | enunciado original                                                                     |
+| Caminho                               | Responsabilidade                                                                        |
+| ------------------------------------- | --------------------------------------------------------------------------------------- |
+| `apps/transactions/src/transactions/` | endpoints, repositório Prisma, mapper para o contrato, consumer do veredito             |
+| `apps/transactions/src/outbox/`       | outbox transacional (`enqueue` na transação de quem chama) e relay que publica          |
+| `apps/transactions/src/kafka/`        | cliente kafkajs, producer com criação de tópicos no boot                                |
+| `apps/transactions/src/common/`       | pipe de validação (schemas zod), filtro global de erro, `x-request-id`                  |
+| `apps/transactions/prisma/`           | `schema.prisma` e migrations versionadas (o catálogo de tipos é semeado por migration)  |
+| `apps/transactions/test/integration/` | app inteira contra o Postgres do compose, schema `test`, Kafka substituído por fakes    |
+| `apps/anti-fraud/src/anti-fraud/`     | regra pura (`fraud-policy.ts`), handler que publica o veredito, consumer                |
+| `apps/web/src/features/transactions/` | API client, filtros na URL, hooks com polling condicional, telas                        |
+| `apps/web/src/components/ui/`         | primitivos shadcn/ui (button, dialog, sheet, select…), badge de status, estados de tela |
+| `apps/web/src/components/app-shell/`  | sidebar, header de página e casca do dashboard                                          |
+| `apps/web/test/`                      | setup do MSW, fixtures, `renderWithQuery`                                               |
+| `packages/contracts/src/`             | schemas zod da API e dos eventos, tópicos, fábrica `createEvent`                        |
+| `packages/messaging/src/`             | producer, `runConsumer` (validação → retry com backoff → DLQ), `ensureTopics`           |
+| `scripts/smoke.ts`                    | verificação ponta a ponta contra a stack real (`pnpm smoke`)                            |
+| `docs/desafio.md`                     | enunciado original                                                                      |
 
 Tudo que entra ou sai pela rede (corpo, query, resposta, evento) tem schema em
 `@challenge/contracts`; backend e frontend validam com o **mesmo objeto**.
@@ -101,7 +102,8 @@ Um problema encontrado depois do merge vira um PR `fix/` próprio, com a causa n
 - Comentários explicam o porquê; o quê está no código. Arquivos focados numa responsabilidade.
 - Frontend: páginas do App Router são cascas finas; dados no cliente com TanStack Query; estado da
   listagem na URL; marcação acessível (`<label>`, `role="status"`/`aria-busy`, `role="alert"`,
-  `<table>` com `caption`, `<nav aria-label>`), porque os testes consultam por papel.
+  tabela em grade com `role="table"` + `aria-label`, `<nav aria-label>`), porque os testes
+  consultam por papel.
 
 ## Testes
 
@@ -164,6 +166,10 @@ placeholders `set this to true or false` que o pnpm insere no arquivo.
 - **Tarefas do Turbo que escrevem no mesmo diretório não podem rodar em paralelo**: `typecheck`
   (`next typegen`) e `build` do dashboard escrevem em `.next`; `apps/web/turbo.json` serializa os dois.
 - **PostgreSQL local em 5432** é comum: `POSTGRES_PORT=5433` + porta em `DATABASE_URL` no `.env`.
+- **Radix em jsdom** depende dos stubs de `apps/web/test/setup.ts` (pointer capture,
+  `scrollIntoView`, `ResizeObserver`, `matchMedia`) e de `pointerEventsCheck: 0` no user-event; o
+  `Select` não aceita item com `value=""` (sentinela `ALL`); o sonner guarda toasts em estado de
+  módulo — o `afterEach` global chama `toast.dismiss()`.
 
 ## Antes de dar uma tarefa por concluída
 

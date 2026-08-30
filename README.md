@@ -29,13 +29,13 @@ flowchart LR
   API -- "UPDATE … WHERE status = PENDING" --> DB
 ```
 
-| Peça                 | O que faz                                                                                                                                                                                                      |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/transactions`  | API NestJS: cria (`PENDING` + evento no **outbox transacional**), consulta e lista com filtros/paginação; relay publica o outbox no Kafka; consome o veredito e aplica com um `UPDATE` condicional idempotente |
-| `apps/anti-fraud`    | Serviço NestJS stateless: consome `transaction.created`, aplica a regra (acima de `ANTI_FRAUD_VALUE_LIMIT` = 1000 rejeita) e publica `transaction.status.updated` com `causationId`/`correlationId`            |
-| `apps/web`           | Dashboard Next.js 16: listagem com filtros na URL e paginação, detalhe, criação com validação — estados de carregamento/erro/vazio explícitos; **polling condicional** enquanto houver transação pendente      |
-| `packages/contracts` | Schemas zod dos corpos e respostas da API e dos eventos (envelope versionado), compartilhados por backend e frontend                                                                                           |
-| `packages/messaging` | Camada fina sobre o kafkajs: producer, consumer com **validação → retry com backoff → DLQ**, criação idempotente dos tópicos no boot                                                                           |
+| Peça                 | O que faz                                                                                                                                                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/transactions`  | API NestJS: cria (`PENDING` + evento no **outbox transacional**), consulta e lista com filtros/paginação; relay publica o outbox no Kafka; consome o veredito e aplica com um `UPDATE` condicional idempotente        |
+| `apps/anti-fraud`    | Serviço NestJS stateless: consome `transaction.created`, aplica a regra (acima de `ANTI_FRAUD_VALUE_LIMIT` = 1000 rejeita) e publica `transaction.status.updated` com `causationId`/`correlationId`                   |
+| `apps/web`           | Dashboard Next.js 16 + shadcn/ui: listagem com filtros na URL, cards de resumo, detalhe em sheet e criação em dialog (com deep link), toasts de veredito — **polling condicional** enquanto houver transação pendente |
+| `packages/contracts` | Schemas zod dos corpos e respostas da API e dos eventos (envelope versionado), compartilhados por backend e frontend                                                                                                  |
+| `packages/messaging` | Camada fina sobre o kafkajs: producer, consumer com **validação → retry com backoff → DLQ**, criação idempotente dos tópicos no boot                                                                                  |
 
 Garantias que o desenho dá e que os testes cobrem:
 
@@ -127,7 +127,9 @@ um guard recusa commits diretos em `develop` e nomes de branch fora de `<tipo>/<
   evento de origem, o contrato publisher↔consumer e o wiring dos módulos.
 - **web**: cada tela com Testing Library + MSW, consultando por papel acessível — carregamento,
   erro com "tentar novamente", vazio, filtros e paginação na URL, polling que para quando tudo é
-  final, formulário com erros por campo e 400 da API levado ao campo.
+  final, cards de resumo, busca por UUID, linha que pisca no veredito, sheet de detalhe e dialog
+  de criação (erros por campo, 400 da API levado ao campo) e um único toast por veredito mesmo
+  com listagem e detalhe abertos.
 
 ### Verificação ponta a ponta
 
@@ -171,12 +173,24 @@ Eventos (`packages/contracts`): envelope
 mensagem = id da transação, tópicos `transaction.created` e `transaction.status.updated`, cada um
 com `<tópico>.dlq`.
 
+## Dashboard
+
+Interface fiel ao design aprovado no Claude Design: sidebar com o contador de transações, cards
+de resumo alimentados por `GET /transactions/stats`, tabela com filtros na URL, detalhe em
+**sheet** lateral e criação em **dialog** — ambos com deep link (`/transactions/:id` e
+`/transactions/new` renderizam a listagem com o overlay aberto; fechar navega de volta
+preservando filtros e página). A busca aceita um UUID completo e abre o detalhe direto (a API não
+tem busca por id). O veredito do antifraude chega pelo polling condicional e vira um toast; a
+linha pisca e os cards atualizam sem recarregar. `NEXT_PUBLIC_ANTI_FRAUD_VALUE_LIMIT` espelha o
+limite apenas para a tela (valor acima do limite em vermelho, aviso no formulário, motivo no
+detalhe) — a regra continua exclusivamente no serviço antifraude.
+
 ## Organização do repositório
 
 ```
 apps/transactions     API NestJS de transacoes (Prisma + Postgres); migrations em prisma/migrations
 apps/anti-fraud       servico NestJS que avalia cada transacao criada e publica o veredito
-apps/web              dashboard Next.js (App Router, Tailwind, TanStack Query)
+apps/web              dashboard Next.js (App Router, Tailwind, shadcn/ui, TanStack Query)
 packages/contracts    schemas zod da API e dos eventos, compartilhados por backend e frontend
 packages/messaging    camada fina sobre o kafkajs: producer, consumer com retry/DLQ, topicos no boot
 scripts/smoke.ts      verificacao ponta a ponta (pnpm smoke)

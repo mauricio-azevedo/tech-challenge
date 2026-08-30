@@ -88,4 +88,26 @@ describe('TransactionsPage (URL como fonte de verdade)', () => {
     expect(await screen.findByText('todo o período')).toBeInTheDocument();
     expect(screen.getByText('30')).toBeInTheDocument();
   });
+
+  it('abre o sheet de detalhe quando a rota traz um id', async () => {
+    search = '';
+    const transaction = buildTransaction();
+    server.use(
+      api.get('/transactions', () => api.json(page([transaction]))),
+      api.get(`/transactions/${transaction.transactionExternalId}`, () => api.json(transaction)),
+    );
+
+    renderWithQuery(<TransactionsPage detailId={transaction.transactionExternalId} />);
+
+    expect(await screen.findByRole('dialog', { name: 'Transação' })).toBeInTheDocument();
+  });
+
+  it('abre o dialog de criacao quando a rota e /transactions/new', async () => {
+    search = '';
+    server.use(api.get('/transactions', () => api.json(page([]))));
+
+    renderWithQuery(<TransactionsPage createOpen />);
+
+    expect(await screen.findByRole('dialog', { name: 'Nova transação' })).toBeInTheDocument();
+  });
 });

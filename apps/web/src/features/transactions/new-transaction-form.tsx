@@ -1,18 +1,27 @@
 'use client';
 
-import { createTransactionSchema, type CreateTransactionInput } from '@challenge/contracts';
+import {
+  createTransactionSchema,
+  type CreateTransactionInput,
+  type TransactionResponse,
+} from '@challenge/contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { useId } from 'react';
-import { useForm, type FieldPath } from 'react-hook-form';
+import { Controller, useForm, useWatch, type FieldPath } from 'react-hook-form';
+import { toast } from 'sonner';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { ApiError } from '@/lib/api-client';
+import { shortId } from '@/lib/transaction-labels';
+import { cn } from '@/lib/utils';
 
 import { useTransactionTypes } from './hooks';
+import { TransferTypePicker } from './transfer-type-picker';
 import { useCreateTransaction } from './use-create-transaction';
-
-const inputClass =
-  'w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-1 aria-[invalid=true]:border-rose-500 aria-[invalid=true]:ring-rose-500 border-slate-300 focus:border-slate-500 focus:ring-slate-500';
+import { ValueRuleHint } from './value-rule-hint';
 
 const FIELDS: FieldPath<CreateTransactionInput>[] = [
   'accountExternalIdDebit',
@@ -21,27 +30,40 @@ const FIELDS: FieldPath<CreateTransactionInput>[] = [
   'value',
 ];
 
+const UUID_PLACEHOLDER = '00000000-0000-0000-0000-000000000000';
+
 /**
  * O formulario valida com o **mesmo schema** que a API (`createTransactionSchema`): o que a tela
  * aceita, o backend aceita. Um 400 da API (que nao deveria acontecer) ainda assim volta para o
- * campo certo via `fieldErrors`.
+ * campo certo via `fieldErrors`. Cada campo tem um unico no de dica, que vira a mensagem de erro
+ * quando ha uma — e e so para ele que o aria-describedby aponta.
  */
-export function NewTransactionForm() {
-  const router = useRouter();
+export function NewTransactionForm({
+  onCancel,
+  onCreated,
+}: {
+  onCancel: () => void;
+  onCreated: (transaction: TransactionResponse) => void;
+}) {
   const types = useTransactionTypes();
   const formId = useId();
   const {
     register,
+    control,
     handleSubmit,
     setError,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<CreateTransactionInput>({
     resolver: zodResolver(createTransactionSchema),
     defaultValues: { accountExternalIdDebit: '', accountExternalIdCredit: '' },
   });
 
   const create = useCreateTransaction((transaction) => {
-    router.push(`/transactions/${transaction.transactionExternalId}`);
+    toast('Transação criada', {
+      description: `Pendente de análise · ID ${shortId(transaction.transactionExternalId)}`,
+      icon: <span aria-hidden="true" className="size-2 rounded-full bg-status-pending" />,
+    });
+    onCreated(transaction);
   });
 
   const onSubmit = handleSubmit(async (input) => {
@@ -58,18 +80,24 @@ export function NewTransactionForm() {
     }
   });
 
-  const describedBy = (field: FieldPath<CreateTransactionInput>) =>
-    errors[field] === undefined ? undefined : `${formId}-${field}-error`;
+  const hintId = (field: FieldPath<CreateTransactionInput>) => `${formId}-${field}-hint`;
 
-  const fieldError = (field: FieldPath<CreateTransactionInput>) => {
-    const error = errors[field];
-    if (error?.message === undefined) return null;
+  const hint = (field: FieldPath<CreateTransactionInput>, fallback: string) => {
+    const message = errors[field]?.message;
     return (
-      <p id={`${formId}-${field}-error`} className="text-sm text-rose-700">
-        {error.message}
+      <p
+        id={hintId(field)}
+        className={cn(
+          'text-[11.5px]',
+          message === undefined ? 'text-zinc-400' : 'text-status-rejected-fg',
+        )}
+      >
+        {message ?? fallback}
       </p>
     );
   };
+
+  const watchedValue: number | undefined = useWatch({ control, name: 'value' });
 
   const generalError =
     create.isError &&
@@ -83,101 +111,119 @@ export function NewTransactionForm() {
         void onSubmit(event);
       }}
       noValidate
-      className="space-y-5 rounded-lg border border-slate-200 bg-white p-6"
     >
-      <div className="space-y-1">
-        <label htmlFor={`${formId}-debit`} className="text-sm font-medium text-slate-700">
-          Conta de débito
-        </label>
-        <input
-          id={`${formId}-debit`}
-          className={inputClass}
-          placeholder="UUID da conta de origem"
-          autoComplete="off"
-          aria-invalid={errors.accountExternalIdDebit !== undefined}
-          aria-describedby={describedBy('accountExternalIdDebit')}
-          {...register('accountExternalIdDebit')}
-        />
-        {fieldError('accountExternalIdDebit')}
-      </div>
-
-      <div className="space-y-1">
-        <label htmlFor={`${formId}-credit`} className="text-sm font-medium text-slate-700">
-          Conta de crédito
-        </label>
-        <input
-          id={`${formId}-credit`}
-          className={inputClass}
-          placeholder="UUID da conta de destino"
-          autoComplete="off"
-          aria-invalid={errors.accountExternalIdCredit !== undefined}
-          aria-describedby={describedBy('accountExternalIdCredit')}
-          {...register('accountExternalIdCredit')}
-        />
-        {fieldError('accountExternalIdCredit')}
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <div className="space-y-1">
-          <label htmlFor={`${formId}-type`} className="text-sm font-medium text-slate-700">
-            Tipo de transferência
-          </label>
-          <select
-            id={`${formId}-type`}
-            className={inputClass}
-            aria-invalid={errors.transferTypeId !== undefined}
-            aria-describedby={describedBy('transferTypeId')}
-            {...register('transferTypeId', {
-              // <select> entrega string; o schema espera o id numerico.
-              setValueAs: (value: string) => (value === '' ? undefined : Number(value)),
-            })}
-          >
-            <option value="">Selecione</option>
-            {(types.data ?? []).map((type) => (
-              <option key={type.id} value={type.id}>
-                {type.name}
-              </option>
-            ))}
-          </select>
-          {fieldError('transferTypeId')}
-        </div>
-
-        <div className="space-y-1">
-          <label htmlFor={`${formId}-value`} className="text-sm font-medium text-slate-700">
-            Valor (R$)
-          </label>
-          <input
-            id={`${formId}-value`}
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            min="0.01"
-            className={inputClass}
-            aria-invalid={errors.value !== undefined}
-            aria-describedby={describedBy('value')}
-            {...register('value', { valueAsNumber: true })}
+      <div className="flex flex-col gap-[15px] px-6 pt-4 pb-[22px]">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${formId}-debit`} className="text-[12.5px]">
+            Conta de origem
+          </Label>
+          <Input
+            id={`${formId}-debit`}
+            placeholder={UUID_PLACEHOLDER}
+            autoComplete="off"
+            className="h-9 font-mono text-[13px]"
+            aria-invalid={errors.accountExternalIdDebit !== undefined}
+            aria-describedby={hintId('accountExternalIdDebit')}
+            {...register('accountExternalIdDebit')}
           />
-          {fieldError('value')}
+          {hint('accountExternalIdDebit', 'Identificador da conta que será debitada')}
         </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${formId}-credit`} className="text-[12.5px]">
+            Conta de destino
+          </Label>
+          <Input
+            id={`${formId}-credit`}
+            placeholder={UUID_PLACEHOLDER}
+            autoComplete="off"
+            className="h-9 font-mono text-[13px]"
+            aria-invalid={errors.accountExternalIdCredit !== undefined}
+            aria-describedby={hintId('accountExternalIdCredit')}
+            {...register('accountExternalIdCredit')}
+          />
+          {hint('accountExternalIdCredit', 'Identificador da conta que receberá o valor')}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${formId}-value`} className="text-[12.5px]">
+            Valor (R$)
+          </Label>
+          <Input
+            id={`${formId}-value`}
+            type="text"
+            inputMode="decimal"
+            placeholder="120,00"
+            autoComplete="off"
+            className="h-9 font-mono text-[13px]"
+            aria-invalid={errors.value !== undefined}
+            aria-describedby={hintId('value')}
+            {...register('value', {
+              // O campo aceita virgula como no mockup; vazio vira NaN, o mesmo que valueAsNumber
+              // faria, para o schema apontar o campo.
+              setValueAs: (raw: unknown) =>
+                typeof raw === 'string'
+                  ? raw.trim() === ''
+                    ? Number.NaN
+                    : Number(raw.replace(',', '.'))
+                  : raw,
+            })}
+          />
+          {hint('value', 'Maior que zero')}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <span id={`${formId}-type-label`} className="text-[12.5px] font-medium">
+            Tipo de transferência
+          </span>
+          <Controller
+            control={control}
+            name="transferTypeId"
+            render={({ field }) => (
+              <TransferTypePicker
+                types={types.data ?? []}
+                value={field.value}
+                onChange={field.onChange}
+                labelId={`${formId}-type-label`}
+                hintId={errors.transferTypeId === undefined ? undefined : hintId('transferTypeId')}
+                invalid={errors.transferTypeId !== undefined}
+              />
+            )}
+          />
+          {errors.transferTypeId !== undefined && hint('transferTypeId', '')}
+        </div>
+
+        <ValueRuleHint
+          value={
+            typeof watchedValue === 'number' && !Number.isNaN(watchedValue)
+              ? watchedValue
+              : undefined
+          }
+        />
+
+        {generalError !== undefined && (
+          <p
+            role="alert"
+            className="rounded-md border border-status-rejected-border bg-status-rejected-bg px-3.5 py-3 text-[13px] text-status-rejected-fg"
+          >
+            {generalError}
+          </p>
+        )}
       </div>
 
-      {generalError !== undefined && (
-        <p
-          role="alert"
-          className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+      <div className="flex items-center justify-end gap-2 border-t px-6 py-3.5">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9 px-3.5 text-[13.5px]"
+          onClick={onCancel}
         >
-          {generalError}
-        </p>
-      )}
-
-      <div className="flex items-center justify-end gap-3">
-        <button
-          type="submit"
-          disabled={isSubmitting || create.isPending}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {create.isPending ? 'Criando…' : 'Criar transação'}
-        </button>
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={create.isPending} className="h-9 gap-2 px-4 text-[13.5px]">
+          {create.isPending && <Loader2 aria-hidden="true" className="size-[13px] animate-spin" />}
+          {create.isPending ? 'Enviando…' : 'Criar transação'}
+        </Button>
       </div>
     </form>
   );

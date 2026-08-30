@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 
 import { cleanup } from '@testing-library/react';
+import { toast } from 'sonner';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 
 import { server } from './msw/server';
@@ -13,6 +14,19 @@ elementProto.hasPointerCapture ??= () => false;
 elementProto.setPointerCapture ??= () => undefined;
 elementProto.releasePointerCapture ??= () => undefined;
 elementProto.scrollIntoView ??= () => undefined;
+
+const matchMediaStub = (query: string): MediaQueryList =>
+  ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    dispatchEvent: () => false,
+  }) as MediaQueryList;
+(window as { matchMedia?: typeof window.matchMedia }).matchMedia ??= matchMediaStub;
 
 class ResizeObserverStub implements ResizeObserver {
   observe(): void {
@@ -35,6 +49,9 @@ beforeAll(() => {
 afterEach(() => {
   server.resetHandlers();
   cleanup();
+  // O sonner guarda os toasts em estado de modulo: sem isso, um toast de um teste reaparece no
+  // Toaster montado pelo teste seguinte.
+  toast.dismiss();
 });
 
 afterAll(() => {
