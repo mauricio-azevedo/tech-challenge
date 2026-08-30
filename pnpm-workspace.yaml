@@ -1,0 +1,16 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Versoes compartilhadas entre os pacotes do workspace (referenciadas como "catalog:").
+catalog:
+  '@types/node': ^22.18.0
+  typescript: ~6.0.3
+  vitest: ^4.1.11
+  '@vitest/coverage-v8': ^4.1.11
+  vite-tsconfig-paths: ^6.1.1
+  zod: ^4.5.4
+  tsx: ^4.23.13
+
+# pnpm bloqueia scripts de instalacao por padrao; liberamos apenas o que precisa compilar/baixar binarios.
+allowBuilds: {}

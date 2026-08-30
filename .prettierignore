@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.next/
+coverage/
+.turbo/
+pnpm-lock.yaml
+**/src/generated/
+# Documentos originais do desafio, mantidos como recebidos.
+docs/desafio.md
+PRACTICES.md

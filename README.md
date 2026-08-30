@@ -1,220 +1,74 @@
-# Desafio Técnico BIUD — Fullstack
+# Transações com validação antifraude
 
-Bem-vindo. Este desafio existe para que você mostre como pensa, decide e organiza código em
-um cenário próximo do que fazemos aqui: uma API orientada a eventos e uma interface que
-precisa lidar com dados que mudam depois que a tela já foi renderizada.
+Solução para o [desafio técnico fullstack da BIUD](./docs/desafio.md): uma API de transações
+financeiras que nasce `pendente`, é validada de forma assíncrona por um serviço antifraude via Kafka
+e tem seu status atualizado depois — e um dashboard que reflete essa mudança sem o usuário recarregar.
 
-O repositório vem praticamente vazio de propósito. Montar o projeto — workspace, tooling,
-padrões, integração contínua — faz parte do desafio, porque faz parte do trabalho.
+> Projeto em construção. Este README cresce a cada pull request; o histórico de decisões está em
+> [DECISIONS.md](./DECISIONS.md) e as práticas seguidas em [PRACTICES.md](./PRACTICES.md).
 
-Leia o [PRACTICES.md](./PRACTICES.md) antes de começar: o que está lá são requisitos, não
-sugestões.
+## Pré-requisitos
 
-- [O problema](#o-problema)
-- [Contratos](#contratos)
-- [O que você precisa entregar](#o-que-você-precisa-entregar)
-- [O que já vem no repositório](#o-que-já-vem-no-repositório)
-- [Stack](#stack)
-- [Subindo a infraestrutura](#subindo-a-infraestrutura)
-- [Defesa do código](#defesa-do-código)
-- [Como entregar](#como-entregar)
+| Ferramenta | Versão | Observação                                                    |
+| ---------- | ------ | ------------------------------------------------------------- |
+| Node.js    | 22.23+ | `nvm install` lê o `.nvmrc`                                   |
+| pnpm       | 11.x   | versão fixada em `packageManager`; o pnpm 11 se auto-gerencia |
+| Docker     | 24+    | com o plugin `compose`, para Postgres, Kafka e Kafka UI       |
 
----
-
-## O problema
-
-Toda transação financeira criada precisa ser validada por um microserviço antifraude. Esse
-serviço avalia a transação e devolve o resultado, que atualiza o status do registro
-original.
-
-Uma transação tem três status possíveis: **pendente**, **aprovada** e **rejeitada**. Toda
-transação com valor **acima de 1000** deve ser rejeitada; as demais são aprovadas.
-
-```mermaid
-flowchart LR
-  Transaction -- Salva com status pendente --> DB[(Database)]
-  Transaction -- Evento transaction.created --> AntiFraud[Anti-Fraud]
-  AntiFraud -- Evento transaction.status.updated --> Transaction
-  Transaction -- Atualiza o status --> DB
-```
-
-A comunicação entre os dois serviços é feita por **Kafka**. A chamada de criação não pode
-esperar o resultado da validação: a transação nasce `pendente` e muda de status depois, de
-forma assíncrona.
-
-## Contratos
-
-### Criar uma transação
-
-```json
-{
-  "accountExternalIdDebit": "Guid",
-  "accountExternalIdCredit": "Guid",
-  "transferTypeId": 1,
-  "value": 120
-}
-```
-
-### Recuperar uma transação
-
-```json
-{
-  "transactionExternalId": "Guid",
-  "transactionType": { "name": "" },
-  "transactionStatus": { "name": "" },
-  "value": 120,
-  "createdAt": "Date"
-}
-```
-
-### Eventos
-
-Estes são os dois eventos do fluxo. O formato do payload é decisão sua — só precisa ser
-consistente entre quem publica e quem consome.
-
-| Evento | Publicado por | Consumido por |
-| --- | --- | --- |
-| `transaction.created` | `transactions` | `anti-fraud` |
-| `transaction.status.updated` | `anti-fraud` | `transactions` |
-
-## O que você precisa entregar
-
-### Fundação do projeto
-
-Você começa do zero. Espera-se que monte:
-
-- A estrutura do projeto — monorepo ou repositórios separados por serviço, a escolha é sua
-- TypeScript configurado
-- Lint e formatação, rodando também como hook de pre-commit
-- Validação de mensagem de commit (Conventional Commits)
-- Um comando único que roda todo o quality gate
-- Integração contínua no GitHub Actions, executando esse mesmo quality gate e **verde ao final**
-
-O [PRACTICES.md](./PRACTICES.md) detalha o que cada um desses itens precisa cobrir.
-
-### Backend
-
-- Endpoint de criação de transação, gravando com status `pendente` e publicando o evento de criação
-- Endpoint de consulta de uma transação pelo identificador externo
-- Endpoint de listagem paginada, com filtros por status, tipo e período — é o que alimenta o dashboard
-- Serviço antifraude consumindo o evento de criação, aplicando a regra e publicando o resultado
-- Consumo do evento de retorno no serviço de transações, atualizando o status
-- Modelagem de dados e migrations versionadas
-
-### Frontend
-
-Um dashboard sobre essa API, com:
-
-- **Listagem** paginada, com filtros por status, tipo e período
-- **Detalhe** de uma transação
-- **Criação** de transação por formulário, com validação
-- **Estados de tela** tratados explicitamente: carregando, erro e lista vazia
-
-Repare que a transação aparece como `pendente` e muda de status fora do ciclo de request do
-usuário. Como a interface reflete essa mudança é decisão sua — e queremos ler o porquê dela.
-
-### Testes
-
-Testes automatizados cobrindo as regras de negócio no backend e as telas principais no
-frontend.
-
-### DECISIONS.md
-
-Crie um `DECISIONS.md` na raiz. Para **cada decisão estruturante** — organização do projeto,
-modelagem de dados, formato dos eventos, tratamento de falha na mensageria, atualização do
-status na interface, estratégia de testes — registre:
-
-1. Qual foi a decisão
-2. Que alternativas você considerou
-3. Por que escolheu essa
-
-Inclua também sua resposta para esta pergunta:
-
-> A aplicação pode precisar lidar com um volume alto de escritas e leituras concorrentes.
-> Como você abordaria esse requisito?
-
-Não precisa implementar a resposta — precisa defendê-la.
-
-Uma decisão sem alternativa considerada não é uma decisão, é um acidente. É o **porquê** que
-nos interessa.
-
-### README do seu projeto
-
-Substitua este README pelo seu: o que você construiu, como rodar, como testar e o que ficou
-de fora. Quem clona o seu repositório precisa conseguir subir tudo sem perguntar nada.
-
-## O que já vem no repositório
-
-Só a infraestrutura local, para que todo mundo desenvolva contra os mesmos serviços:
-
-| Arquivo | Para quê |
-| --- | --- |
-| `docker-compose.yml` | Postgres, Kafka e Kafka UI |
-| `.env.example` | Variáveis de ambiente do ambiente local |
-| `.editorconfig`, `.gitignore`, `.nvmrc` | Convenções básicas de editor e versão do Node |
-| `.github/pull_request_template.md` | Template de PR |
-
-Todo o resto é seu. Nada aqui é intocável: se sua arquitetura pedir outra coisa, mude — e
-registre o porquê no `DECISIONS.md`.
-
-## Stack
-
-O uso desta stack é obrigatório, porque é a que usamos aqui:
-
-| Camada | Tecnologia |
-| --- | --- |
-| Runtime | Node.js 22+ |
-| Gerenciador de pacotes | pnpm |
-| Backend | NestJS + TypeScript |
-| ORM | Prisma |
-| Banco | PostgreSQL |
-| Mensageria | Kafka |
-| Frontend | Next.js + React + Tailwind |
-| Testes | À sua escolha, desde que rodem no quality gate |
-
-Dentro dessa stack, a organização do código é sua: paradigma, camadas, modularização e
-estilo ficam a seu critério.
-
-## Subindo a infraestrutura
+## Como rodar
 
 ```bash
-cp .env.example .env
-docker compose up -d
+nvm install              # Node da versao do .nvmrc
+cp .env.example .env     # variaveis do ambiente local
+docker compose up -d     # Postgres :5432, Kafka :9092, Kafka UI :8080
+pnpm install
 ```
 
-Serviços disponíveis depois disso:
+_As aplicações chegam nos próximos PRs; os comandos para subi-las serão documentados aqui._
 
-| Serviço | Endereço |
-| --- | --- |
-| Postgres | `localhost:5432` |
-| Kafka | `localhost:9092` |
-| Kafka UI | http://localhost:8080 |
+## Quality gate
 
-As portas das suas aplicações ficam a seu critério; o `.env.example` sugere 3001 para a API
-de transações, 3002 para o antifraude e 3000 para o dashboard.
+Um único comando roda tudo que valida o projeto — é o mesmo que a integração contínua executa:
 
-## Defesa do código
+```bash
+pnpm quality
+```
 
-Depois da entrega, conversamos sobre o código. Você vai percorrer as escolhas do
-`DECISIONS.md`, explicar por que cada uma foi feita e o que mudaria com outros requisitos.
+Cada etapa também roda isolada, para o ciclo curto do dia a dia:
 
-Usar IA no dia a dia é normal e aqui também é — não é isso que estamos medindo. O que
-avaliamos é se você entende, sustenta e consegue mudar aquilo que entregou. Código que você
-não sabe explicar não conta a seu favor, tenha vindo de onde tiver vindo.
+| Comando             | O que faz                                            |
+| ------------------- | ---------------------------------------------------- |
+| `pnpm lint`         | ESLint (regras com checagem de tipos) em todo o repo |
+| `pnpm format:check` | Prettier em modo verificação (`pnpm format` corrige) |
+| `pnpm typecheck`    | `tsc --noEmit` em cada pacote                        |
+| `pnpm test`         | Vitest em cada pacote                                |
+| `pnpm build`        | build de cada pacote, na ordem do grafo              |
 
-## Como entregar
+Antes de cada commit, `lint-staged` roda ESLint e Prettier apenas nos arquivos alterados, e o
+`commitlint` recusa mensagens fora do padrão [Conventional Commits](https://www.conventionalcommits.org/pt-br/v1.0.0/).
+Um guard adicional recusa commits diretos em `develop` e branches fora do padrão `<tipo>/<descricao-kebab>`.
 
-1. Faça um **fork** deste repositório
-2. Desenvolva no seu fork, com commits incrementais, seguindo o [PRACTICES.md](./PRACTICES.md)
-3. Compartilhe o fork com os avaliadores, em **Settings → Collaborators**:
+> Os hooks são instalados pelo `pnpm install` (via `husky`). Se você commita por um cliente gráfico
+> (WebStorm, VS Code) e usa `nvm`, crie `~/.config/husky/init.sh` carregando o nvm para que `pnpm`
+> esteja no `PATH` do hook:
+>
+> ```sh
+> export NVM_DIR="$HOME/.nvm"
+> [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+> ```
 
-   - alex.silveira@biud.com.br
-   - marcelo.oliveira@biud.com.br
-   - gustavofarias@biud.com.br
+## Organização do repositório
 
-4. Avise a conclusão por e-mail dentro do prazo de **5 dias corridos**
+```
+apps/        aplicacoes (transactions, anti-fraud, web)
+packages/    codigo compartilhado (contracts, messaging)
+docs/        enunciado original do desafio
+```
 
-Ficou alguma dúvida sobre o enunciado? Pergunte — tirar dúvida faz parte do processo e não
-conta contra você.
+Monorepo com pnpm workspaces e Turborepo — o porquê está em [DECISIONS.md](./DECISIONS.md).
 
-Boa sorte.
+## Convenções
+
+- Branches saem de `develop` com o tipo do commit no nome: `feat/criacao-de-transacao`.
+- Commits pequenos, no padrão Conventional Commits: `feat(transactions): adiciona endpoint de criacao`.
+- Todo trabalho entra por pull request para `develop`, com o template preenchido.
