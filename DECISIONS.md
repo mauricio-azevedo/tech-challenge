@@ -266,3 +266,23 @@ inexistente — as duas coisas acontecem exatamente na primeira execução, a de
 antes de o antifraude subir ficariam pendentes para sempre. Sem `disconnect` no shutdown, cada
 restart do `--watch` deixa um membro zumbi no grupo e a nova instância fica sem partições até o
 `sessionTimeout`.
+
+## Serviço antifraude: stateless, regra pura, limite vindo do ambiente
+
+**Decisão:** `apps/anti-fraud` não tem banco. Consome `transaction.created`, aplica
+`evaluateTransaction` (função pura: valor **acima** de `ANTI_FRAUD_VALUE_LIMIT`, padrão 1000, é
+rejeitado; no limite, aprova) e publica `transaction.status.updated` com `causationId` apontando
+para o evento consumido e o `correlationId` propagado. Expõe só `/health`, que reporta se o
+consumer está de fato rodando.
+
+**Alternativas consideradas:** persistir cada avaliação (auditoria) no antifraude; expor a
+avaliação também como endpoint HTTP síncrono; limite fixo no código.
+
+**Por quê:** a avaliação é determinística a partir do próprio evento, então reprocessar uma
+mensagem (redelivery) produz o mesmo veredito — o serviço é idempotente por construção e escala
+horizontalmente sem coordenação. Auditoria de vereditos é responsabilidade de quem guarda a
+transação (o status final já fica lá); se fosse necessário histórico de avaliações, seria uma
+tabela de eventos _no antifraude_, não uma dependência dele na API de transações. Um endpoint
+síncrono reintroduziria o acoplamento que o enunciado pede para evitar. O limite é configuração
+porque o número muda com o negócio; a regra ("acima de" estrito) é código, com teste nos limites
+(1000 aprova, 1000.01 rejeita).
