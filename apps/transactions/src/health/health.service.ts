@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service.js';
+import { TransactionStatusUpdatedConsumer } from '../transactions/transaction-status-updated.consumer.js';
 
 export type CheckStatus = 'up' | 'down';
 
@@ -13,10 +14,16 @@ export interface HealthReport {
 export class HealthService {
   private readonly logger = new Logger(HealthService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly consumer: TransactionStatusUpdatedConsumer,
+  ) {}
 
   async check(): Promise<HealthReport> {
-    const checks = { database: await this.checkDatabase() };
+    const checks = {
+      database: await this.checkDatabase(),
+      kafka: this.consumer.isRunning ? ('up' as const) : ('down' as const),
+    };
     const status = Object.values(checks).every((check) => check === 'up') ? 'ok' : 'degraded';
     return { status, checks };
   }

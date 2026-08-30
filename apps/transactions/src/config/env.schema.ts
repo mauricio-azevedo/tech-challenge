@@ -25,6 +25,7 @@ export const envSchema = z.object({
   WEB_ORIGIN: z.url().default('http://localhost:3000'),
   KAFKA_BROKERS: brokerListSchema,
   KAFKA_CLIENT_ID_TRANSACTIONS: z.string().min(1).default('transactions'),
+  KAFKA_GROUP_ID_TRANSACTIONS: z.string().min(1).default('transactions-consumer'),
   KAFKA_TOPIC_PARTITIONS: z.coerce.number().int().positive().default(3),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(500),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().max(500).default(50),
