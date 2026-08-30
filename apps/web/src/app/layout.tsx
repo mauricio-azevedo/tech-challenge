@@ -8,6 +8,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: { default: 'Transações', template: '%s · Transações' },
+  applicationName: 'Transações',
   description: 'Dashboard de transações com validação antifraude',
 };
 
