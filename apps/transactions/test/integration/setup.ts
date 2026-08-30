@@ -15,8 +15,13 @@ export interface TestApp {
 
 /** Sobe a aplicacao inteira contra o schema de teste preparado pelo global-setup. */
 export async function createTestApp(): Promise<TestApp> {
-  process.env.DATABASE_URL = inject('databaseUrl');
-  process.env.NODE_ENV = 'test';
+  // Guarda contra o erro que ja aconteceu: a app conectar no banco de desenvolvimento por o env
+  // de teste ter sido definido tarde demais (ver setup-env.ts).
+  if (process.env.DATABASE_URL !== inject('databaseUrl')) {
+    throw new Error(
+      'DATABASE_URL de teste nao esta ativa; verifique setupFiles em vitest.config.ts',
+    );
+  }
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication<INestApplication<Server>>();
