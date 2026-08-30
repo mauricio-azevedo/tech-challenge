@@ -9,17 +9,33 @@ import { Button } from '@/components/ui/button';
 
 import { parseListState, type ListState } from './filters';
 import { detailHref, listHref, newTransactionHref } from './navigation';
+import { NewTransactionDialog } from './new-transaction-dialog';
 import { StatsCards } from './stats-cards';
+import { TransactionSheet } from './transaction-sheet';
 import { TransactionsList } from './transactions-list';
 
-/** Liga a listagem a URL: le os filtros de `?status=...` e escreve de volta a cada mudanca. */
-export function TransactionsPage() {
+/**
+ * Liga a listagem a URL — inclusive os overlays: /transactions/:id abre o sheet de detalhe e
+ * /transactions/new abre o dialog de criacao, com a lista viva por baixo. Fechar navega de volta
+ * preservando filtros e pagina.
+ */
+export function TransactionsPage({
+  detailId,
+  createOpen = false,
+}: {
+  detailId?: string | undefined;
+  createOpen?: boolean | undefined;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const state = parseListState(new URLSearchParams(searchParams.toString()));
 
   const setState = (next: ListState) => {
     router.replace(listHref(next), { scroll: false });
+  };
+
+  const closeOverlay = () => {
+    router.push(listHref(state), { scroll: false });
   };
 
   return (
@@ -53,6 +69,18 @@ export function TransactionsPage() {
           }}
         />
       </main>
+
+      {detailId !== undefined && (
+        <TransactionSheet transactionExternalId={detailId} onClose={closeOverlay} />
+      )}
+      <NewTransactionDialog
+        open={createOpen}
+        onClose={closeOverlay}
+        onCreated={() => {
+          // A recem-criada e pendente: a lista limpa a mostra no topo, ja sob polling.
+          router.push('/transactions', { scroll: false });
+        }}
+      />
     </>
   );
 }
