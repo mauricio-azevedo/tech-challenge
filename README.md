@@ -75,6 +75,7 @@ Um guard adicional recusa commits diretos em `develop` e branches fora do padrã
 
 ```
 apps/transactions     API NestJS de transacoes (Prisma + Postgres); migrations em prisma/migrations
+apps/anti-fraud       servico NestJS que avalia cada transacao criada e publica o veredito
 packages/contracts    schemas zod da API e dos eventos, compartilhados por backend e frontend
 packages/messaging    camada fina sobre o kafkajs: producer, consumer com retry/DLQ, topicos no boot
 docs/                 enunciado original do desafio
@@ -89,6 +90,11 @@ transação de banco (tabela `outbox_events`). Um relay dentro do serviço publi
 pendentes no Kafka a cada `OUTBOX_POLL_INTERVAL_MS`; com o broker fora do ar a API continua
 aceitando escritas e os eventos saem quando ele voltar. Os tópicos (e suas DLQs) são criados no
 boot do serviço. Para ver as mensagens: Kafka UI em http://localhost:8080.
+
+O serviço antifraude consome `transaction.created`, aplica a regra (valor acima de
+`ANTI_FRAUD_VALUE_LIMIT`, padrão 1000, é rejeitado) e publica `transaction.status.updated`.
+Mensagens que não podem ser processadas (JSON inválido, payload fora do contrato, falha repetida
+do handler) vão para `<tópico>.dlq` com o motivo nos headers; nada trava a fila.
 
 ## Convenções
 
