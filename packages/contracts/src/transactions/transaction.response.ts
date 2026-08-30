@@ -2,6 +2,11 @@ import { z } from 'zod';
 
 import { transactionStatusSchema } from './transaction-status.js';
 
+/** Identificador externo de uma transacao (o `id` UUID do registro). */
+export const transactionExternalIdSchema = z.uuid({
+  error: 'identificador deve ser um UUID valido',
+});
+
 export const transactionTypeResponseSchema = z.object({
   id: z.int().positive(),
   name: z.string().min(1),
@@ -15,7 +20,7 @@ export type TransactionTypeResponse = z.infer<typeof transactionTypeResponseSche
  * `updatedAt`, que o detalhe no dashboard precisa mostrar.
  */
 export const transactionResponseSchema = z.object({
-  transactionExternalId: z.uuid(),
+  transactionExternalId: transactionExternalIdSchema,
   accountExternalIdDebit: z.uuid(),
   accountExternalIdCredit: z.uuid(),
   transactionType: transactionTypeResponseSchema,
