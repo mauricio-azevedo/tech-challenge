@@ -5,15 +5,18 @@ import { Test } from '@nestjs/testing';
 import { inject } from 'vitest';
 
 import { AppModule } from '../../src/app.module.js';
+import { KafkaProducerService } from '../../src/kafka/kafka-producer.service.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
+import { FakePublisher } from './fake-publisher.js';
 
 export interface TestApp {
   app: INestApplication<Server>;
   prisma: PrismaService;
+  publisher: FakePublisher;
   close: () => Promise<void>;
 }
 
-/** Sobe a aplicacao inteira contra o schema de teste preparado pelo global-setup. */
+/** Sobe a aplicacao inteira contra o schema de teste preparado pelo global-setup, sem Kafka. */
 export async function createTestApp(): Promise<TestApp> {
   // Guarda contra o erro que ja aconteceu: a app conectar no banco de desenvolvimento por o env
   // de teste ter sido definido tarde demais (ver setup-env.ts).
@@ -23,11 +26,15 @@ export async function createTestApp(): Promise<TestApp> {
     );
   }
 
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  const publisher = new FakePublisher();
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(KafkaProducerService)
+    .useValue(publisher)
+    .compile();
   const app = moduleRef.createNestApplication<INestApplication<Server>>();
   await app.init();
 
-  return { app, prisma: app.get(PrismaService), close: () => app.close() };
+  return { app, prisma: app.get(PrismaService), publisher, close: () => app.close() };
 }
 
 /** Limpa os dados criados pelos testes; o catalogo de tipos (semeado por migration) permanece. */

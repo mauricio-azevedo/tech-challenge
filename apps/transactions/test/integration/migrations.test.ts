@@ -40,6 +40,8 @@ describe('schema de teste', () => {
 
     expect(rows[0]?.search_path).toBe('test');
     // Se o SQL cru olhasse para outro schema, esta tabela nao existiria para ele.
-    await expect(testApp.prisma.$executeRawUnsafe('SELECT 1 FROM "transactions"')).resolves.toBe(0);
+    await expect(testApp.prisma.$executeRawUnsafe('SELECT 1 FROM "transactions"')).resolves.toEqual(
+      expect.any(Number),
+    );
   });
 });

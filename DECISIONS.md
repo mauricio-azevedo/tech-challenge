@@ -209,3 +209,60 @@ veredito.
 **Por quê:** com um único identificador dá para seguir uma requisição da API até a atualização de
 status nos logs dos dois serviços. O id da transação serve para o dado, não para a requisição —
 um retry do cliente com o mesmo `x-request-id` fica visível como tal.
+
+## Mensageria: camada própria sobre o kafkajs em vez do transporte Kafka do NestJS
+
+**Decisão:** um pacote `@challenge/messaging` (sem dependência do Nest) com um producer
+(`acks=-1`, particionador padrão explícito), um `runConsumer` com política única de consumo e um
+`ensureTopics` para o boot. Cada serviço embrulha isso nos seus providers.
+
+**Alternativas consideradas:** `@nestjs/microservices` com `Transport.KAFKA` (`@EventPattern`,
+`ClientKafka`), que é o caminho idiomático do framework; `@confluentinc/kafka-javascript`
+(librdkafka) ou `@platformatic/kafka` no lugar do kafkajs.
+
+**Por quê:** lendo o fonte de `@nestjs/microservices@12.0.1` (`server/server-kafka.js`,
+`context/rpc-proxy.js`, `server/server.js`): uma exceção num handler `@EventPattern` passa pelo
+`RpcProxy` → `RpcExceptionsHandler` e vira um observable de erro que ninguém assina — é logada e o
+offset avança. Ou seja, o transporte entrega eventos **at-most-once**, e a `KafkaRetriableException`
+só é honrada no caminho request/response (`combineStreamsAndThrowIfRetriable`). Para este fluxo,
+"o banco oscilou e o veredito se perdeu" é inaceitável; precisávamos de retry com backoff, DLQ e
+at-least-once com handlers idempotentes, e isso exige controlar o `eachMessage`. A camada tem
+~200 linhas, é testada com fakes e não conhece o Nest. O kafkajs está estável mas sem manutenção
+ativa; as alternativas nativas exigiriam de qualquer forma um transporte próprio, e a troca fica
+confinada a esse pacote.
+
+## Relay do outbox: claim com `FOR UPDATE SKIP LOCKED`, publicação fora de transação
+
+**Decisão:** o relay roda em processo, num `setTimeout` reagendado a cada ciclo (500ms). Cada
+ciclo reivindica um lote (`UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED) RETURNING`),
+publica cada evento fora de qualquer transação de banco e marca `published_at`. Falha incrementa
+`attempts` e guarda o erro; no limite, `failed_at` retira o evento da fila. Um claim mais velho que
+o timeout é considerado abandonado e volta a ser elegível.
+
+**Alternativas consideradas:** `setInterval` (ciclos se sobrepõem quando o broker demora);
+manter a transação de banco aberta durante o `send` no Kafka; `LISTEN/NOTIFY` do Postgres para
+acordar o relay sem polling; publicar diretamente na requisição com o outbox só como fallback.
+
+**Por quê:** o `SKIP LOCKED` é o que permite mais de um relay (ou mais de uma instância da API)
+sem publicar em dobro, e custa uma cláusula. Transação aberta esperando o broker é a receita para
+esgotar o pool quando o Kafka oscila. Polling de 500ms é invisível para o usuário e trivial de
+operar; `LISTEN/NOTIFY` reduz a latência, mas adiciona uma conexão dedicada e um caminho a mais
+para falhar — é a evolução natural se a latência importar. Publicar na requisição reintroduziria
+justamente a dependência do broker que o outbox eliminou.
+
+## Tópicos criados no boot, `fromBeginning` e desligamento controlado
+
+**Decisão:** cada serviço garante no boot os tópicos do fluxo e suas DLQs (`admin.createTopics`
+idempotente, com `waitForLeaders`, partições via `KAFKA_TOPIC_PARTITIONS`). Consumers assinam com
+`fromBeginning: true`. `enableShutdownHooks()` desconecta producer e consumer em SIGTERM.
+
+**Alternativas consideradas:** depender do `auto.create.topics.enable` do broker; script de
+provisionamento à parte; `fromBeginning: false`.
+
+**Por quê:** com auto-create, o primeiro publish num tópico novo falha com
+`LEADER_NOT_AVAILABLE` até a eleição de líder, e um consumer não consegue assinar tópico
+inexistente — as duas coisas acontecem exatamente na primeira execução, a demo. Um grupo novo com
+`fromBeginning: false` ignora tudo que foi publicado antes de ele existir: transações criadas
+antes de o antifraude subir ficariam pendentes para sempre. Sem `disconnect` no shutdown, cada
+restart do `--watch` deixa um membro zumbi no grupo e a nova instância fica sem partições até o
+`sessionTimeout`.
