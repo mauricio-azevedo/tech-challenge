@@ -1,21 +1,37 @@
 import type { TransactionStatus } from '@challenge/contracts';
 
-import { statusLabels, statusTone } from '@/lib/transaction-labels';
+import { statusLabels } from '@/lib/transaction-labels';
+import { cn } from '@/lib/utils';
 
-const toneClasses = {
-  neutral: 'bg-amber-50 text-amber-800 ring-amber-200',
-  success: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  danger: 'bg-rose-50 text-rose-800 ring-rose-200',
-} as const;
+const tones: Record<TransactionStatus, { pill: string; dot: string }> = {
+  PENDING: {
+    pill: 'border-status-pending-border bg-status-pending-bg text-status-pending-fg',
+    dot: 'bg-status-pending',
+  },
+  APPROVED: {
+    pill: 'border-status-approved-border bg-status-approved-bg text-status-approved-fg',
+    dot: 'bg-status-approved',
+  },
+  REJECTED: {
+    pill: 'border-status-rejected-border bg-status-rejected-bg text-status-rejected-fg',
+    dot: 'bg-status-rejected',
+  },
+};
 
+/** Pill de status do mockup; o ponto pulsa enquanto a analise nao termina. */
 export function StatusBadge({ status }: { status: TransactionStatus }) {
+  const tone = tones[status];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${toneClasses[statusTone[status]]}`}
-    >
-      {status === 'PENDING' && (
-        <span aria-hidden="true" className="size-1.5 animate-pulse rounded-full bg-amber-500" />
+      className={cn(
+        'inline-flex h-[22px] w-fit items-center gap-1.5 rounded-full border px-2 text-xs font-medium',
+        tone.pill,
       )}
+    >
+      <span
+        aria-hidden="true"
+        className={cn('size-1.5 rounded-full', tone.dot, status === 'PENDING' && 'animate-pulse')}
+      />
       {statusLabels[status]}
     </span>
   );
