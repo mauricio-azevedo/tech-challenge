@@ -1,4 +1,8 @@
-import type { TransactionResponse, TransactionTypeResponse } from '@challenge/contracts';
+import type {
+  TransactionResponse,
+  TransactionStatsResponse,
+  TransactionTypeResponse,
+} from '@challenge/contracts';
 
 export const transactionTypes: TransactionTypeResponse[] = [
   { id: 1, name: 'TED' },
@@ -22,6 +26,17 @@ export function buildTransaction(
     value: 120,
     createdAt: '2026-08-30T12:00:00.000Z',
     updatedAt: '2026-08-30T12:00:00.000Z',
+    ...overrides,
+  };
+}
+
+export function buildStats(
+  overrides: Partial<TransactionStatsResponse> = {},
+): TransactionStatsResponse {
+  return {
+    total: 0,
+    byStatus: { PENDING: 0, APPROVED: 0, REJECTED: 0 },
+    approvedVolume: 0,
     ...overrides,
   };
 }
