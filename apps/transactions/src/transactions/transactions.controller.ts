@@ -28,6 +28,13 @@ export class TransactionsController {
     return this.transactions.list(query);
   }
 
+  // Declarada antes de ':transactionExternalId': o Express casa rotas na ordem de declaracao, e
+  // sem isso "stats" seria tratado como identificador (400 de UUID invalido).
+  @Get('stats')
+  stats() {
+    return this.transactions.stats();
+  }
+
   @Get(':transactionExternalId')
   findOne(
     @Param('transactionExternalId', { schema: transactionExternalIdSchema })
