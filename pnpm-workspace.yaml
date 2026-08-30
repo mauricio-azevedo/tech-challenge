@@ -3,14 +3,15 @@ packages:
   - packages/*
 
 # Versoes compartilhadas entre os pacotes do workspace (referenciadas como "catalog:").
+# Mantemos o minimumReleaseAge padrao do pnpm (1 dia): versoes mais novas que isso nao entram.
 catalog:
   '@types/node': ^22.18.0
   typescript: ~6.0.3
   vitest: ^4.1.11
   '@vitest/coverage-v8': ^4.1.11
   vite-tsconfig-paths: ^6.1.1
-  zod: ^4.5.4
+  zod: ^4.5.0
   tsx: ^4.23.13
 
-# pnpm bloqueia scripts de instalacao por padrao; liberamos apenas o que precisa compilar/baixar binarios.
-allowBuilds: {}
+# pnpm bloqueia scripts de instalacao de dependencias por padrao; entradas em allowBuilds liberam
+# apenas o que precisa compilar ou baixar binarios (pnpm approve-builds).
