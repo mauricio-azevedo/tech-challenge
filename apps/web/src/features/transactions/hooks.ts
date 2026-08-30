@@ -32,10 +32,15 @@ export function useTransactions(state: ListState, pollIntervalMs: number = env.p
   });
 }
 
-export function useTransaction(id: string, pollIntervalMs: number = env.pollIntervalMs) {
+export function useTransaction(
+  id: string,
+  pollIntervalMs: number = env.pollIntervalMs,
+  enabled = true,
+) {
   return useQuery({
     queryKey: transactionKeys.detail(id),
     queryFn: () => getTransaction(id),
+    enabled,
     refetchInterval: (q) => (hasPendingTransaction(q.state.data) ? pollIntervalMs : false),
   });
 }
