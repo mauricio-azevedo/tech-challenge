@@ -349,3 +349,35 @@ função interna. Consultar por papel obriga a marcação a ser acessível, que 
 pede e o que um usuário de leitor de tela recebe. Playwright cobriria o navegador de verdade,
 mas com uma pilha inteira de pé para cada teste; fica como o próximo passo se o dashboard
 crescer.
+
+## Atualização de status na interface: polling condicional
+
+**Decisão:** listagem e detalhe refazem a busca a cada `NEXT_PUBLIC_POLL_INTERVAL_MS` (3s)
+**enquanto houver transação pendente na tela**; quando tudo é final, o polling para sozinho
+(`refetchInterval` do TanStack Query em função dos dados). Voltar para a aba também refaz a busca.
+A transação recém-criada aparece como `pendente` e muda de status sem recarregar.
+
+**Alternativas consideradas:** Server-Sent Events alimentados pelo consumer de
+`transaction.status.updated`; WebSocket; polling fixo (sempre ligado); não atualizar (exigir
+recarregar a página).
+
+**Por quê:** o veredito chega em ~1s e o número de transações pendentes ao mesmo tempo é baixo, então
+o custo do polling condicional é uma requisição leve a cada 3s _só enquanto há o que esperar_ —
+e zero estado de conexão no servidor, o que mantém a API stateless e horizontalmente escalável
+sem mais nada. SSE é a evolução natural quando `pendentes × abas abertas` crescer: exige que o
+servidor mantenha conexões abertas e, com mais de uma instância, um mecanismo de fan-out (cada
+instância consumiria o tópico, ou um pub/sub) — custo que não se justifica hoje, e o ponto de
+troca é um só hook (`useTransactions`/`useTransaction`). WebSocket seria bidirecional para um
+fluxo que só desce. Polling fixo desperdiça requisições quando não há nada pendente.
+
+## Filtros e paginação na URL
+
+**Decisão:** o estado da listagem (status, tipo, período, página) vive na query string, lido
+com o mesmo schema zod da API e escrito de volta a cada mudança (omitindo o que é padrão).
+Mudar um filtro volta para a página 1.
+
+**Alternativas consideradas:** estado em memória (React state); estado global (store).
+
+**Por quê:** a URL é compartilhável, o botão voltar funciona e recarregar preserva o que o
+usuário estava vendo — de graça, sem store. Um valor inválido na URL é ignorado campo a campo em
+vez de quebrar a tela. A página N de um filtro não significa nada em outro filtro.
