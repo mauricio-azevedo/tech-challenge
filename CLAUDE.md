@@ -158,6 +158,11 @@ placeholders `set this to true or false` que o pnpm insere no arquivo.
   depois de `pnpm format`, ou relendo o arquivo; senão o trecho a substituir não casa.
 - **`pnpm smoke` e `next start` usam o build existente**: depois de mudar código, `pnpm dev` (watch)
   ou rebuild antes de verificar.
+- **O `OutboxRelay` roda em segundo plano também na app de teste**: `createTestApp()` chama
+  `relay.stop()` logo após o `init`; sem isso o timer disputa os eventos com os `flush()` dos testes
+  (falhou no CI, não localmente). Ao montar outra app de teste, faça o mesmo.
+- **Tarefas do Turbo que escrevem no mesmo diretório não podem rodar em paralelo**: `typecheck`
+  (`next typegen`) e `build` do dashboard escrevem em `.next`; `apps/web/turbo.json` serializa os dois.
 - **PostgreSQL local em 5432** é comum: `POSTGRES_PORT=5433` + porta em `DATABASE_URL` no `.env`.
 
 ## Antes de dar uma tarefa por concluída
