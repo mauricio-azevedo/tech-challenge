@@ -32,5 +32,5 @@ export async function createTestApp(): Promise<TestApp> {
 
 /** Limpa os dados criados pelos testes; o catalogo de tipos (semeado por migration) permanece. */
 export async function resetDatabase(prisma: PrismaService): Promise<void> {
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE "transactions" CASCADE');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE "transactions", "outbox_events" CASCADE');
 }
