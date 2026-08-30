@@ -22,20 +22,26 @@ justificam.
 
 ## Quality gate: ESLint + Prettier + Vitest + tsc, com hooks de git
 
-**Decisão:** `pnpm quality` = `lint` → `format:check` → `turbo run typecheck test build`. ESLint 10
+**Decisão:** `pnpm quality` = `lint` → `format:check` → `turbo run typecheck test build`. ESLint 9
 (flat config único na raiz, regras `strictTypeChecked` do typescript-eslint), Prettier como única
 fonte de formatação, Vitest como único runner de testes em todos os pacotes. `husky` + `lint-staged`
 no `pre-commit`; `commitlint` no `commit-msg`; um guard de nome de branch no `pre-commit`.
 
-**Alternativas consideradas:** Biome ou oxlint no lugar de ESLint/Prettier; Jest para o backend
-(padrão histórico do NestJS) e Vitest para o frontend; validar branch/commit só no CI.
+**Alternativas consideradas:** Biome ou oxlint no lugar de ESLint/Prettier; ESLint 10 (o
+`latest`); Jest para o backend (padrão histórico do NestJS) e Vitest para o frontend; validar
+branch/commit só no CI.
 
 **Por quê:** as regras com checagem de tipos do typescript-eslint (`no-floating-promises`,
 `no-misused-promises`, `no-explicit-any` como erro) pegam a classe de bug que mais importa em código
 assíncrono orientado a eventos, e Biome/oxlint ainda não as têm com a mesma profundidade. Um único
 runner de testes evita dois conjuntos de config, mocks e matchers no mesmo repositório — e o NestJS 12
 já gera projetos com Vitest. Validar no hook, além do CI, impede que a mensagem errada sequer entre no
-histórico, que é parte do que se avalia.
+histórico, que é parte do que se avalia. O ESLint ficou no 9 (e não no 10) porque o
+`eslint-plugin-react`, que o `eslint-config-next` usa, ainda chama APIs removidas no 10
+(`context.getFilename`) — o dashboard não lintaria; o typescript-eslint e o `eslint-config-next`
+suportam os dois majors, então nada do que usamos depende do 10. O 9 está em modo de manutenção
+(dist-tag `maintenance`): a troca para o 10 fica agendada para quando o `eslint-plugin-react`
+acompanhar, e é uma linha no `package.json`.
 
 ## Versões: TypeScript 6, não 7; Node 22.23
 
@@ -307,3 +313,39 @@ conta, por exemplo); aqui seria uma tabela a mais para proteger o que a condiç�
 "Transação desconhecida" não melhora com retry — com o outbox, a transação é gravada antes de o
 evento existir, então esse cenário indica dado corrompido ou ambiente cruzado, e o lugar dele é o
 log de alerta, não uma fila que ninguém drena.
+
+## Dashboard: Next.js App Router com dados buscados no cliente (TanStack Query)
+
+**Decisão:** as páginas do Next são cascas finas (Server Components sem dados); quem busca e
+mantém os dados é o TanStack Query em componentes cliente, através de um `fetch` tipado contra a
+API (`apiRequest`) que traduz erros em algo que a tela sabe usar (`fieldErrors` por campo,
+`retryable`). Sem retry automático: o erro aparece, com botão de tentar de novo.
+
+**Alternativas consideradas:** buscar nos Server Components e revalidar com `router.refresh()`;
+Server Actions para a criação; SWR; `fetch` direto em `useEffect`.
+
+**Por quê:** o requisito central da interface é refletir uma mudança que acontece _depois_ da
+renderização (pendente → aprovada/rejeitada). Isso exige polling ou push no cliente de qualquer
+jeito; concentrar toda a busca no cliente dá um único modelo mental (cache por chave, estados
+`isPending`/`isError`, `refetch`) em vez de dois (RSC para a primeira carga, cliente para as
+seguintes). O TanStack Query resolve cache, deduplicação, polling condicional e refetch ao voltar
+para a aba — o que o `useEffect` faria na mão e mal. Server Actions acoplam o formulário ao Next
+quando a API já existe e já valida com o mesmo schema. O custo é um _skeleton_ na primeira carga
+em vez de HTML pronto — irrelevante num dashboard interno.
+
+## Testes do frontend: Vitest + Testing Library + MSW, consultando por papel acessível
+
+**Decisão:** componentes testados com Testing Library consultando por papel (`getByRole`,
+`getByLabelText`), com a rede interceptada pelo MSW (um handler por teste; requisição sem
+handler é erro). Estados de carregamento, erro e vazio têm marcação acessível (`role="status"`
+com `aria-busy`, `role="alert"`) e são testados por ela.
+
+**Alternativas consideradas:** mockar o módulo do client HTTP (`vi.mock`); testes end-to-end no
+navegador (Playwright); `data-testid`.
+
+**Por quê:** o MSW exercita o código real de `fetch`, serialização e tratamento de erro — é o
+comportamento observável, não a implementação; mockar o módulo testaria a assinatura de uma
+função interna. Consultar por papel obriga a marcação a ser acessível, que é o que o PRACTICES
+pede e o que um usuário de leitor de tela recebe. Playwright cobriria o navegador de verdade,
+mas com uma pilha inteira de pé para cada teste; fica como o próximo passo se o dashboard
+crescer.

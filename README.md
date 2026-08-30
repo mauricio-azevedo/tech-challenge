@@ -76,6 +76,7 @@ Um guard adicional recusa commits diretos em `develop` e branches fora do padrã
 ```
 apps/transactions     API NestJS de transacoes (Prisma + Postgres); migrations em prisma/migrations
 apps/anti-fraud       servico NestJS que avalia cada transacao criada e publica o veredito
+apps/web              dashboard Next.js (App Router, Tailwind, TanStack Query)
 packages/contracts    schemas zod da API e dos eventos, compartilhados por backend e frontend
 packages/messaging    camada fina sobre o kafkajs: producer, consumer com retry/DLQ, topicos no boot
 docs/                 enunciado original do desafio
