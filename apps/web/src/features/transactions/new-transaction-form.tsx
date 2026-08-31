@@ -7,6 +7,7 @@ import {
 } from '@challenge/contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useId, type FocusEvent } from 'react';
 import { Controller, useForm, type FieldPath } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -22,6 +23,7 @@ import { AccountSuggestions } from './account-suggestions';
 import { AmountInput } from './amount-input';
 import { GenerateUuidButton } from './generate-uuid-button';
 import { useRecentAccounts, useTransactionTypes } from './hooks';
+import { transactionHref } from './navigation';
 import { TransferTypePicker } from './transfer-type-picker';
 import { useCreateTransaction } from './use-create-transaction';
 
@@ -47,6 +49,7 @@ export function NewTransactionForm({
   onCancel: () => void;
   onCreated: (transaction: TransactionResponse) => void;
 }) {
+  const router = useRouter();
   const types = useTransactionTypes();
   const recent = useRecentAccounts();
   const formId = useId();
@@ -66,6 +69,13 @@ export function NewTransactionForm({
     toast('Transação criada', {
       description: `Pendente de análise · ID ${shortId(transaction.transactionExternalId)}`,
       icon: <span aria-hidden="true" className="size-2 rounded-full bg-status-pending" />,
+      // O toast e o unico lugar que sabe qual transacao acabou de nascer: dai o atalho para ela.
+      action: {
+        label: 'Ver transação',
+        onClick: () => {
+          router.push(transactionHref(transaction.transactionExternalId), { scroll: false });
+        },
+      },
     });
     onCreated(transaction);
   });

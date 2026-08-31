@@ -2,10 +2,14 @@
 
 import type { PaginatedTransactionsResponse, TransactionResponse } from '@challenge/contracts';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 
 import { formatValue, shortId } from '@/lib/transaction-labels';
+
+import { parseListState } from './filters';
+import { detailHref } from './navigation';
 
 function transactionsIn(data: unknown): TransactionResponse[] {
   if (data === null || typeof data !== 'object') return [];
@@ -25,6 +29,7 @@ function transactionsIn(data: unknown): TransactionResponse[] {
  */
 export function VerdictToasts() {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   useEffect(() => {
     const pendingIds = new Set<string>();
@@ -48,6 +53,15 @@ export function VerdictToasts() {
             }
           />
         ),
+        action: {
+          label: 'Ver transação',
+          onClick: () => {
+            // Le a URL na hora do clique, e nao no render: o toast e global e sobrevive a troca de
+            // rota, entao os filtros que valem sao os que estao na tela agora.
+            const state = parseListState(new URLSearchParams(window.location.search));
+            router.push(detailHref(transaction.transactionExternalId, state), { scroll: false });
+          },
+        },
       });
     };
 
@@ -58,7 +72,7 @@ export function VerdictToasts() {
       if (scope !== 'transactions') return;
       for (const transaction of transactionsIn(event.query.state.data)) consider(transaction);
     });
-  }, [queryClient]);
+  }, [queryClient, router]);
 
   return null;
 }

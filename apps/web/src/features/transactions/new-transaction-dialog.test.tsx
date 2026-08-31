@@ -8,6 +8,14 @@ import { server } from '../../../test/msw/server';
 import { renderWithQuery } from '../../../test/render';
 import { NewTransactionDialog } from './new-transaction-dialog';
 
+const push = vi.fn();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push, replace: vi.fn() }),
+  usePathname: () => '/transactions/new',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 const debit = '3f2b1d3e-8c4a-4f6e-9a1b-2c3d4e5f6a7b';
 const credit = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
 
@@ -24,6 +32,7 @@ const dialog = () => screen.getByRole('dialog', { name: 'Nova transação' });
 
 describe('NewTransactionDialog', () => {
   beforeEach(() => {
+    push.mockClear();
     server.use(
       api.get('/transaction-types', () => api.json(transactionTypes)),
       // O formulario sugere as contas das ultimas transacoes; por padrao, nao ha nenhuma.
@@ -113,6 +122,11 @@ describe('NewTransactionDialog', () => {
       value: 120.5,
     });
     expect(await screen.findByText('Transação criada')).toBeInTheDocument();
+
+    await u.click(screen.getByRole('button', { name: 'Ver transação' }));
+    expect(push).toHaveBeenCalledWith(`/transactions/${created.transactionExternalId}`, {
+      scroll: false,
+    });
   });
 
   it('digita o valor com mascara de moeda, dos centavos para a esquerda', async () => {
