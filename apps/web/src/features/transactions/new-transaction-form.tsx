@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { ApiError } from '@/lib/api-client';
 import { shortId } from '@/lib/transaction-labels';
 
+import { GenerateUuidButton } from './generate-uuid-button';
 import { useTransactionTypes } from './hooks';
 import { TransferTypePicker } from './transfer-type-picker';
 import { useCreateTransaction } from './use-create-transaction';
@@ -50,6 +51,7 @@ export function NewTransactionForm({
     control,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors },
   } = useForm<CreateTransactionInput>({
     resolver: zodResolver(createTransactionSchema),
@@ -93,6 +95,13 @@ export function NewTransactionForm({
   const describedBy = (field: FieldPath<CreateTransactionInput>) =>
     errors[field] === undefined ? undefined : hintId(field);
 
+  const fillWithUuid = (
+    field: 'accountExternalIdDebit' | 'accountExternalIdCredit',
+    uuid: string,
+  ) => {
+    setValue(field, uuid, { shouldValidate: true });
+  };
+
   const generalError =
     create.isError &&
     Object.keys(create.error instanceof ApiError ? create.error.fieldErrors : {}).length === 0
@@ -111,15 +120,23 @@ export function NewTransactionForm({
           <Label htmlFor={`${formId}-debit`} className="text-[12.5px]">
             Conta de origem
           </Label>
-          <Input
-            id={`${formId}-debit`}
-            placeholder={UUID_PLACEHOLDER}
-            autoComplete="off"
-            className="h-9 font-mono text-[13px]"
-            aria-invalid={errors.accountExternalIdDebit !== undefined}
-            aria-describedby={describedBy('accountExternalIdDebit')}
-            {...register('accountExternalIdDebit')}
-          />
+          <div className="relative">
+            <Input
+              id={`${formId}-debit`}
+              placeholder={UUID_PLACEHOLDER}
+              autoComplete="off"
+              className="h-9 pr-9 font-mono text-[13px]"
+              aria-invalid={errors.accountExternalIdDebit !== undefined}
+              aria-describedby={describedBy('accountExternalIdDebit')}
+              {...register('accountExternalIdDebit')}
+            />
+            <GenerateUuidButton
+              label="Gerar UUID da conta de origem"
+              onGenerate={(uuid) => {
+                fillWithUuid('accountExternalIdDebit', uuid);
+              }}
+            />
+          </div>
           {errorHint('accountExternalIdDebit')}
         </div>
 
@@ -127,15 +144,23 @@ export function NewTransactionForm({
           <Label htmlFor={`${formId}-credit`} className="text-[12.5px]">
             Conta de destino
           </Label>
-          <Input
-            id={`${formId}-credit`}
-            placeholder={UUID_PLACEHOLDER}
-            autoComplete="off"
-            className="h-9 font-mono text-[13px]"
-            aria-invalid={errors.accountExternalIdCredit !== undefined}
-            aria-describedby={describedBy('accountExternalIdCredit')}
-            {...register('accountExternalIdCredit')}
-          />
+          <div className="relative">
+            <Input
+              id={`${formId}-credit`}
+              placeholder={UUID_PLACEHOLDER}
+              autoComplete="off"
+              className="h-9 pr-9 font-mono text-[13px]"
+              aria-invalid={errors.accountExternalIdCredit !== undefined}
+              aria-describedby={describedBy('accountExternalIdCredit')}
+              {...register('accountExternalIdCredit')}
+            />
+            <GenerateUuidButton
+              label="Gerar UUID da conta de destino"
+              onGenerate={(uuid) => {
+                fillWithUuid('accountExternalIdCredit', uuid);
+              }}
+            />
+          </div>
           {errorHint('accountExternalIdCredit')}
         </div>
 
