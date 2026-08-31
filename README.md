@@ -1,231 +1,129 @@
 # Transações com validação antifraude
 
-Solução para o [desafio técnico fullstack da BIUD](./docs/desafio.md): uma API de transações
-financeiras em que cada transação nasce `pendente`, é avaliada de forma assíncrona por um serviço
-antifraude via Kafka e tem o status atualizado depois — e um dashboard que reflete essa mudança
-sem o usuário recarregar a página.
+API de transações financeiras em que cada transação nasce `PENDING`, é avaliada de forma assíncrona
+por um serviço antifraude via Kafka e tem o status atualizado depois — com um dashboard que reflete
+essa mudança sem o usuário recarregar a página.
 
-As decisões de arquitetura, com alternativas e porquês, estão em [DECISIONS.md](./DECISIONS.md).
-As práticas seguidas estão em [PRACTICES.md](./PRACTICES.md).
+Solução para o [desafio técnico da BIUD](./docs/desafio.md). As decisões estão em [DECISIONS.md](./DECISIONS.md); as práticas de processo, em [PRACTICES.md](./PRACTICES.md).
 
-- [O que foi construído](#o-que-foi-construído)
 - [Como rodar](#como-rodar)
-- [Como testar](#como-testar)
+- [O que foi construído](#o-que-foi-construído)
 - [API](#api)
-- [Organização do repositório](#organização-do-repositório)
-- [Convenções](#convenções)
+- [Dashboard](#dashboard)
+- [Como testar](#como-testar)
+
 - [O que ficou de fora](#o-que-ficou-de-fora)
+
+## Como rodar
+
+Pré-requisitos: Node 22.23+ (`nvm install` lê o `.nvmrc`), pnpm 11, Docker com o plugin `compose`.
+
+```bash
+cp .env.example .env     # antes do install: o postinstall gera o client do Prisma
+docker compose up -d     # 5432 ocupada? ajuste POSTGRES_PORT e DATABASE_URL no .env
+pnpm install
+pnpm db:migrate
+pnpm dev                 # transactions :3001, anti-fraud :3002, dashboard :3000
+```
+
+O Kafka UI fica em <http://localhost:8080>.
 
 ## O que foi construído
 
 ```mermaid
 flowchart LR
-  Web[Dashboard Next.js] -- HTTP --> API[transactions API]
-  API -- "INSERT transação + outbox\n(mesma transação)" --> DB[(Postgres)]
-  API -- "relay do outbox" --> K1[/transaction.created/]
-  K1 --> AF[anti-fraud]
-  AF -- "valor > 1000 ⇒ REJECTED" --> K2[/transaction.status.updated/]
-  K2 --> API
-  API -- "UPDATE … WHERE status = PENDING" --> DB
+  Web[dashboard] -- HTTP --> API[transactions]
+  API -- "transação + evento, no mesmo commit" --> DB[(Postgres)]
+  API -- "relay publica" --> T1[/transaction.created/]
+  T1 --> AF[anti-fraud]
+  AF -- "valor > 1000 ⇒ REJECTED" --> T2[/transaction.status.updated/]
+  T2 --> API
+  API -- "UPDATE ... WHERE status = 'PENDING'" --> DB
 ```
 
-| Peça                 | O que faz                                                                                                                                                                                                             |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/transactions`  | API NestJS: cria (`PENDING` + evento no **outbox transacional**), consulta e lista com filtros/paginação; relay publica o outbox no Kafka; consome o veredito e aplica com um `UPDATE` condicional idempotente        |
-| `apps/anti-fraud`    | Serviço NestJS stateless: consome `transaction.created`, aplica a regra (acima de `ANTI_FRAUD_VALUE_LIMIT` = 1000 rejeita) e publica `transaction.status.updated` com `causationId`/`correlationId`                   |
-| `apps/web`           | Dashboard Next.js 16 + shadcn/ui: listagem com filtros na URL, cards de resumo, detalhe em sheet e criação em dialog (com deep link), toasts de veredito — **polling condicional** enquanto houver transação pendente |
-| `packages/contracts` | Schemas zod dos corpos e respostas da API e dos eventos (envelope versionado), compartilhados por backend e frontend                                                                                                  |
-| `packages/messaging` | Camada fina sobre o kafkajs: producer, consumer com **validação → retry com backoff → DLQ**, criação idempotente dos tópicos no boot                                                                                  |
+| Peça                 | Responsabilidade                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| `apps/transactions`  | API de criação, consulta e listagem; publica o evento de criação e consome o veredito |
+| `apps/anti-fraud`    | Consome o evento de criação, aplica a regra e publica o veredito. Não tem banco       |
+| `apps/web`           | Dashboard: listagem com filtros, detalhe, criação e cards de resumo                   |
+| `packages/contracts` | Schemas dos corpos, das respostas e dos eventos, usados pelos três                    |
+| `packages/messaging` | Producer, consumidor com retry e DLQ, e criação dos tópicos no boot                   |
 
-Garantias que o desenho dá e que os testes cobrem:
+O que o desenho garante, e os testes cobrem:
 
-- **Nenhum evento se perde**: o evento é gravado na mesma transação de banco da transação; com o
-  Kafka fora do ar a API continua respondendo 201 e o outbox drena quando ele volta.
-- **Nenhuma mensagem trava a fila**: JSON inválido, payload fora do contrato ou handler que falha
-  repetidamente vão para `<tópico>.dlq` com o motivo nos headers.
-- **Entrega repetida é inofensiva**: o veredito é aplicado com `UPDATE … WHERE status = 'PENDING'`.
-- **Rastreabilidade**: `x-request-id` da requisição vira `correlationId` do evento e do veredito,
-  e aparece nos logs dos dois serviços.
-
-## Como rodar
-
-Pré-requisitos: Node.js 22.23+ (`nvm install` lê o `.nvmrc`), pnpm 11 (fixado em `packageManager`;
-o pnpm 11 se auto-gerencia), Docker com o plugin `compose`.
-
-> **Já existe um PostgreSQL na sua máquina em `localhost:5432`?** É comum em máquinas de
-> desenvolvimento. Os sintomas: o `docker compose up` falha com `address already in use` na porta
-> 5432 e, se você seguir adiante, o `pnpm db:migrate` bate no Postgres errado com
-> "Authentication failed". Logo depois de copiar o `.env`, edite duas linhas nele:
-> `POSTGRES_PORT=5433` e a porta em `DATABASE_URL` (`localhost:5433`). O compose e todos os
-> serviços leem daí.
-
-```bash
-nvm install                 # Node da versao do .nvmrc
-cp .env.example .env        # variaveis do ambiente local (antes do pnpm install)
-                            # -> porta 5432 ocupada? ajuste POSTGRES_PORT e DATABASE_URL no .env agora
-docker compose up -d        # Postgres :5432 (ou POSTGRES_PORT), Kafka :9092, Kafka UI :8080
-pnpm install                # instala, gera o client Prisma e compila os pacotes internos
-pnpm db:migrate             # aplica as migrations (schema + catalogo de tipos)
-pnpm dev                    # sobe transactions :3001, anti-fraud :3002 e o dashboard :3000
-```
-
-| Serviço      | Endereço                              |
-| ------------ | ------------------------------------- |
-| dashboard    | http://localhost:3000                 |
-| transactions | http://localhost:3001/health          |
-| anti-fraud   | http://localhost:3002/health          |
-| Postgres     | `localhost:5432` (ou `POSTGRES_PORT`) |
-| Kafka        | `localhost:9092`                      |
-| Kafka UI     | http://localhost:8080                 |
-
-Os dois `/health` fazem _readiness_ de verdade: só respondem 200 com o banco acessível e o
-consumer Kafka rodando.
-
-## Como testar
-
-### Quality gate
-
-Um único comando roda tudo que valida o projeto — o mesmo que a integração contínua executa a
-cada push e pull request:
-
-```bash
-pnpm quality
-```
-
-| Comando             | O que faz                                                                                                                        |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm bootstrap`    | gera o client Prisma e compila os pacotes internos (`packages/*`); roda no `pnpm install` e antes do lint, que precisa dos tipos |
-| `pnpm lint`         | ESLint com regras de checagem de tipos em todo o repositório                                                                     |
-| `pnpm format:check` | Prettier em modo verificação (`pnpm format` corrige)                                                                             |
-| `pnpm typecheck`    | `tsc --noEmit` em cada pacote (`next typegen` antes, no dashboard)                                                               |
-| `pnpm test`         | Vitest em cada pacote — os testes de integração usam o Postgres do compose, num schema `test` isolado                            |
-| `pnpm build`        | build de cada pacote, na ordem do grafo                                                                                          |
-
-Antes de cada commit, `lint-staged` roda ESLint e Prettier nos arquivos alterados; `commitlint`
-recusa mensagens fora do [Conventional Commits](https://www.conventionalcommits.org/pt-br/v1.0.0/);
-um guard recusa commits diretos em `develop` e nomes de branch fora de `<tipo>/<descricao-kebab>`.
-
-> Commita por um cliente gráfico (WebStorm, VS Code) e usa `nvm`? Crie `~/.config/husky/init.sh`
-> carregando o nvm para que `pnpm` esteja no `PATH` do hook:
->
-> ```sh
-> export NVM_DIR="$HOME/.nvm"
-> [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-> ```
-
-### O que os testes cobrem
-
-- **contracts**: aceitação e rejeição dos schemas (limites de valor, UUIDs, período invertido,
-  paginação) e a consistência dos envelopes de evento.
-- **messaging**: a política do consumer (inválido → DLQ; falha → retry com backoff e `heartbeat`
-  → DLQ com headers; sucesso na segunda tentativa), o producer e a criação de tópicos.
-- **transactions**: unitários (regras, mapeamentos, classificação de erros) e **integração
-  contra o Postgres real** — criação com atomicidade do outbox, filtros/período/paginação da
-  listagem, formato de erro, relay (claims concorrentes não publicam em dobro, falha por evento,
-  claim abandonado expira), transições de status e idempotência.
-- **anti-fraud**: a regra nos limites (1000 aprova, 1000.01 rejeita), o veredito encadeado ao
-  evento de origem, o contrato publisher↔consumer e o wiring dos módulos.
-- **web**: cada tela com Testing Library + MSW, consultando por papel acessível — carregamento,
-  erro com "tentar novamente", vazio, filtros e paginação na URL, polling que para quando tudo é
-  final, cards de resumo, busca por UUID, linha que pisca no veredito, sheet de detalhe e dialog
-  de criação (erros por campo, 400 da API levado ao campo) e um único toast por veredito mesmo
-  com listagem e detalhe abertos.
-
-### Verificação ponta a ponta
-
-Com a infraestrutura e as três aplicações de pé:
-
-```bash
-pnpm smoke
-```
-
-Cria transações de 120, 1500 e 1000 e espera o veredito chegar ao status (`APPROVED`,
-`REJECTED`, `APPROVED`) passando por Postgres, outbox, Kafka e os dois serviços. Fica fora do
-quality gate de propósito: exige a stack inteira.
-
-Para ver a resiliência à queda do broker, à mão: `docker compose stop kafka`, crie uma transação
-(a API responde 201 e a linha fica em `outbox_events` com `attempts` subindo),
-`docker compose start kafka` — o evento sai sozinho e o status é atualizado. Para ver a DLQ:
-publique um texto que não é JSON em `transaction.created` pelo Kafka UI; ele aparece em
-`transaction.created.dlq` com o motivo nos headers e o consumidor segue vivo.
+- **Nenhum evento se perde.** A transação e o evento são gravados no mesmo commit, então a API
+  continua respondendo `201` com o Kafka fora do ar, e a fila drena quando ele volta.
+- **Nenhuma mensagem trava a fila.** JSON inválido, payload fora do contrato ou handler que falha
+  repetidamente vão para `<tópico>.dlq`, com o motivo nos headers.
+- **Entrega repetida é inofensiva.** O veredito só é aplicado se a transação ainda estiver pendente.
+- **Dá para seguir uma requisição inteira.** O `x-request-id` da chamada viaja no evento e aparece
+  nos logs dos dois serviços.
 
 ## API
 
-| Método | Rota                                   | Descrição                                                                                                           |
-| ------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/transactions`                        | cria (`201`, status `PENDING`); `400` com `errors[{ path, message }]`; `422` se o tipo não existe                   |
-| `GET`  | `/transactions/:transactionExternalId` | detalhe (`404` se não existe; `400` se não é UUID)                                                                  |
-| `GET`  | `/transactions`                        | lista paginada: `status`, `transferTypeId`, `from`/`to` (`AAAA-MM-DD`, inclusivos, UTC), `page`, `pageSize` (≤ 100) |
-| `GET`  | `/transactions/stats`                  | totais por status e volume aprovado (sem filtros); alimenta os cards e o contador do dashboard                      |
-| `GET`  | `/transaction-types`                   | catálogo de tipos (semeado pela migration: TED, PIX, DOC)                                                           |
-| `GET`  | `/health`                              | readiness (`database`, `kafka`)                                                                                     |
+Base: `http://localhost:3001`.
+
+| Método | Rota                                   | Descrição                                            |
+| ------ | -------------------------------------- | ---------------------------------------------------- |
+| `POST` | `/transactions`                        | Cria a transação como `PENDING`                      |
+| `GET`  | `/transactions`                        | Listagem paginada, com filtros                       |
+| `GET`  | `/transactions/stats`                  | Totais por status e volume aprovado                  |
+| `GET`  | `/transactions/:transactionExternalId` | Detalhe de uma transação                             |
+| `GET`  | `/transaction-types`                   | Catálogo de tipos                                    |
+| `GET`  | `/health`                              | Reporta banco e consumidor; `degraded` se algum cair |
+
+Filtros da listagem: `status`, `transferTypeId`, `from` e `to` (datas `AAAA-MM-DD`, inclusivas nas
+duas pontas, em UTC), `page` e `pageSize` (padrão 20, máximo 100).
 
 ```bash
-curl -s -X POST localhost:3001/transactions -H 'content-type: application/json' \
-  -d '{"accountExternalIdDebit":"3f2b1d3e-8c4a-4f6e-9a1b-2c3d4e5f6a7b","accountExternalIdCredit":"9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d","transferTypeId":1,"value":120}'
+curl -X POST http://localhost:3001/transactions \
+  -H 'content-type: application/json' \
+  -d '{"accountExternalIdDebit":"3fa85f64-5717-4562-b3fc-2c963f66afa6",
+       "accountExternalIdCredit":"3fa85f64-5717-4562-b3fc-2c963f66afa7",
+       "transferTypeId":1,"value":120}'
 ```
 
-Toda resposta de erro tem a forma `{ statusCode, message, errors? }`; banco inacessível responde
-`503`. O header `x-request-id` (enviado ou gerado) volta na resposta e correlaciona os eventos.
-
-Eventos (`packages/contracts`): envelope
-`{ eventId, eventType, version, occurredAt, correlationId, causationId?, data }`, chave da
-mensagem = id da transação, tópicos `transaction.created` e `transaction.status.updated`, cada um
-com `<tópico>.dlq`.
+Erros vêm sempre como `{ statusCode, message, errors? }`, com um item por campo na validação.
 
 ## Dashboard
 
-Interface fiel ao design aprovado no Claude Design: sidebar com o contador de transações, cards
-de resumo alimentados por `GET /transactions/stats`, tabela com filtros na URL, detalhe em
-**sheet** lateral e criação em **dialog** — ambos com deep link (`/transactions/:id` e
-`/transactions/new` renderizam a listagem com o overlay aberto; fechar navega de volta
-preservando filtros e página). A busca aceita um UUID completo e abre o detalhe direto (a API não
-tem busca por id). O veredito do antifraude chega pelo polling condicional e vira um toast; a
-linha pisca e os cards atualizam sem recarregar. `NEXT_PUBLIC_ANTI_FRAUD_VALUE_LIMIT` espelha o
-limite apenas para a tela (valor acima do limite em vermelho, aviso no formulário, motivo no
-detalhe) — a regra continua exclusivamente no serviço antifraude.
+Uma tela, em <http://localhost:3000>: a listagem, com filtros, paginação e cards de resumo. O
+detalhe abre num painel lateral e a criação num diálogo, os dois por cima da listagem e com rota
+própria — `/transactions/:id` e `/transactions/new` são links compartilháveis. Carregando, erro e
+lista vazia são tratados explicitamente.
 
-## Organização do repositório
+A transação criada aparece como pendente e muda de status sozinha, sem recarregar.
 
-```
-apps/transactions     API NestJS de transacoes (Prisma + Postgres); migrations em prisma/migrations
-apps/anti-fraud       servico NestJS que avalia cada transacao criada e publica o veredito
-apps/web              dashboard Next.js (App Router, Tailwind, shadcn/ui, TanStack Query)
-packages/contracts    schemas zod da API e dos eventos, compartilhados por backend e frontend
-packages/messaging    camada fina sobre o kafkajs: producer, consumer com retry/DLQ, topicos no boot
-scripts/smoke.ts      verificacao ponta a ponta (pnpm smoke)
-docs/desafio.md       enunciado original do desafio
-CLAUDE.md             guia de trabalho no repositorio: fluxo de PR, convencoes, armadilhas conhecidas
+## Como testar
+
+```bash
+pnpm quality   # o gate inteiro: lint, formatação, typecheck, testes e build
+pnpm smoke     # fluxo real ponta a ponta, com a stack de pé
 ```
 
-Monorepo com pnpm workspaces e Turborepo; um `.env` na raiz para tudo (`.env.example` documenta
-cada variável).
+`pnpm quality` é o mesmo comando que a integração contínua roda, com um Postgres como service
+container. Os testes de integração sobem a aplicação inteira contra o Postgres do compose, num schema
+isolado — por isso o compose precisa estar de pé. O `pnpm smoke` cria transações de 120, 1500 e 1000
+e espera os vereditos, que é o único caminho que exercita o Kafka de verdade.
 
-## Convenções
+Etapas isoladas: `pnpm lint`, `pnpm format`, `pnpm typecheck`, `pnpm test`, `pnpm build`. Por pacote,
+`pnpm --filter @challenge/web test:watch`.
 
-- Branches saem de `develop` com o tipo do commit no nome: `feat/criacao-de-transacao`.
-- Commits pequenos, no padrão Conventional Commits: `feat(transactions): adiciona endpoint de criacao`.
-- Todo trabalho entra por pull request para `develop`, com o template preenchido; `develop` exige
-  o check `quality` verde (inclusive para administradores).
+O `typecheck` roda com o TypeScript estrito, incluindo `noUncheckedIndexedAccess`, e o lint usa as
+regras que dependem de tipo. Parte disso roda antes do commit: o `pre-commit` linta e formata o que
+está staged e confere o nome da branch; o `commit-msg` valida a mensagem contra o Conventional
+Commits.
 
 ## O que ficou de fora
 
-- **Autenticação e autorização** — o enunciado não pede; o dashboard fala com a API sem
-  credenciais e o CORS aceita só `WEB_ORIGIN`.
-- **Documentação OpenAPI/Swagger** — os contratos vivem como schemas zod; gerar OpenAPI a partir
-  deles seria o próximo passo se houvesse consumidores externos.
-- **Imagens Docker das aplicações** — o compose sobe só a infraestrutura; as apps rodam com
-  `pnpm dev`. Um `Dockerfile` por app com build multi-stage é trabalho mecânico que não muda o
-  desenho.
-- **Kafka no CI** — o gate roda com Postgres real e Kafka substituído por fakes; o caminho Kafka
-  de verdade é o `pnpm smoke`. Um service container de Kafka no GitHub Actions tornaria o smoke
-  automático.
-- **Observabilidade além de logs estruturados** — sem métricas nem tracing; o `correlationId`
-  nos logs é o mínimo para seguir uma requisição. Lag do consumer e backlog do outbox são as
-  primeiras métricas que eu exporia (ver a resposta sobre concorrência em `DECISIONS.md`).
-- **Chave de idempotência no `POST`** — retries do cliente podem criar duplicatas; está desenhado
-  (`Idempotency-Key` + `UNIQUE`) e não implementado.
-- **Testes end-to-end no navegador** (Playwright) — as telas são testadas com Testing Library e
-  MSW; um E2E de verdade subiria a stack inteira por teste.
-- **`root-env-file.ts` e `nest-messaging-logger.ts` duplicados** entre os dois serviços — quinze
-  linhas cada; um pacote só para isso custaria mais do que a duplicação.
+- **Autenticação** — A API aceita chamadas da origem do dashboard, via CORS.
+- **Chave de idempotência no `POST`** — sob carga, um retry do cliente cria transação duplicada.
+  Está desenhada (`Idempotency-Key` no header, `UNIQUE` no banco) e não implementada.
+- **OpenAPI** — os contratos são schemas zod; gerar a especificação a partir deles seria o passo
+  seguinte se aparecesse um consumidor externo.
+- **Dockerfile das aplicações** — o compose sobe só a infraestrutura; as apps rodam com `pnpm dev`.
+- **Kafka na integração contínua** — o gate roda com Postgres real e Kafka substituído por fakes; o
+  caminho com Kafka de verdade é o `pnpm smoke`, hoje manual.
+- **Métricas e tracing** — só logs estruturados com o `correlationId`.
+- **Testes no navegador** — as telas são testadas com Testing Library e MSW; um end-to-end subiria a
+  stack inteira por teste.
