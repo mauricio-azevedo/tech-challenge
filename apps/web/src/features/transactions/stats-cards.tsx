@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { LoadingRegion } from '@/components/ui/loading-region';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatValue } from '@/lib/transaction-labels';
+import { useHydrated } from '@/lib/use-hydrated';
 import { cn } from '@/lib/utils';
 
 import { useTransactionStats } from './hooks';
@@ -13,8 +14,12 @@ const gridClass = 'grid grid-cols-2 gap-3.5 xl:grid-cols-4';
 /** Os quatro cards do mockup, alimentados por GET /transactions/stats. */
 export function StatsCards() {
   const stats = useTransactionStats();
+  // O resumo tambem alimenta o contador da sidebar, que hidrata antes (fica fora do <Suspense> da
+  // pagina) e ja deixa o cache quente: sem esperar a hidratacao, o cliente renderizaria os cards
+  // onde o servidor mandou o esqueleto.
+  const hydrated = useHydrated();
 
-  if (stats.isPending) {
+  if (!hydrated || stats.isPending) {
     return (
       <LoadingRegion label="Carregando resumo">
         <div className={gridClass}>
