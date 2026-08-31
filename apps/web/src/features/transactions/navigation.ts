@@ -10,8 +10,13 @@ export function listHref(state: ListState): string {
   return withQuery('/transactions', state);
 }
 
+/** Detalhe sem estado de listagem: para quem chega de fora da lista, como a acao de um toast. */
+export function transactionHref(transactionExternalId: string): string {
+  return `/transactions/${encodeURIComponent(transactionExternalId)}`;
+}
+
 export function detailHref(transactionExternalId: string, state: ListState): string {
-  return withQuery(`/transactions/${transactionExternalId}`, state);
+  return withQuery(transactionHref(transactionExternalId), state);
 }
 
 export function newTransactionHref(state: ListState): string {
