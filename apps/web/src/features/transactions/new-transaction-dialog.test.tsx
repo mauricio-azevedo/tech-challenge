@@ -17,7 +17,7 @@ async function fillValidForm(u: ReturnType<typeof user>) {
   await u.type(screen.getByLabelText('Conta de origem'), debit);
   await u.type(screen.getByLabelText('Conta de destino'), credit);
   await u.click(await screen.findByRole('radio', { name: 'PIX' }));
-  await u.type(screen.getByLabelText('Valor (R$)'), '120,50');
+  await u.type(screen.getByLabelText('Valor'), '120,50');
 }
 
 const dialog = () => screen.getByRole('dialog', { name: 'Nova transação' });
@@ -36,13 +36,13 @@ describe('NewTransactionDialog', () => {
     expect(screen.getByLabelText('Conta de destino')).toHaveAccessibleDescription('');
 
     await u.type(screen.getByLabelText('Conta de origem'), 'nao-e-uuid');
-    await u.type(screen.getByLabelText('Valor (R$)'), '0');
+    await u.type(screen.getByLabelText('Valor'), '0');
     await u.click(screen.getByRole('button', { name: 'Criar transação' }));
 
     const debitField = screen.getByLabelText('Conta de origem');
     expect(debitField).toBeInvalid();
     expect(debitField).toHaveAccessibleDescription('deve ser um identificador (UUID) valido');
-    expect(screen.getByLabelText('Valor (R$)')).toHaveAccessibleDescription(
+    expect(screen.getByLabelText('Valor')).toHaveAccessibleDescription(
       'valor deve ser maior que zero',
     );
     expect(screen.getByLabelText('Tipo de transferência')).toBeInvalid();
@@ -105,6 +105,51 @@ describe('NewTransactionDialog', () => {
     expect(await screen.findByText('Transação criada')).toBeInTheDocument();
   });
 
+  it('digita o valor com mascara de moeda, dos centavos para a esquerda', async () => {
+    const u = user();
+    renderWithQuery(<NewTransactionDialog open onClose={vi.fn()} onCreated={vi.fn()} />);
+
+    const valor = screen.getByLabelText<HTMLInputElement>('Valor');
+    await u.type(valor, '1');
+    expect(valor).toHaveValue('0,01');
+    await u.type(valor, '2050');
+    expect(valor).toHaveValue('120,50');
+    await u.type(valor, '{backspace}');
+    expect(valor).toHaveValue('12,05');
+  });
+
+  it('aceita conta colada com espaco e maiuscula, normalizando o que fica na tela', async () => {
+    let received: unknown;
+    server.use(
+      api.post('/transactions', async ({ request }) => {
+        received = await request.json();
+        return api.json(buildTransaction(), 201);
+      }),
+    );
+    const u = user();
+    renderWithQuery(<NewTransactionDialog open onClose={vi.fn()} onCreated={vi.fn()} />);
+
+    const origem = screen.getByLabelText<HTMLInputElement>('Conta de origem');
+    await u.click(origem);
+    await u.paste(` ${debit.toUpperCase()}\n`);
+    await u.tab();
+    expect(origem).toHaveValue(debit);
+
+    await u.type(screen.getByLabelText('Conta de destino'), credit);
+    await u.click(await screen.findByRole('radio', { name: 'PIX' }));
+    await u.type(screen.getByLabelText('Valor'), '12050');
+    await u.click(screen.getByRole('button', { name: 'Criar transação' }));
+
+    await waitFor(() => {
+      expect(received).toEqual({
+        accountExternalIdDebit: debit,
+        accountExternalIdCredit: credit,
+        transferTypeId: 2,
+        value: 120.5,
+      });
+    });
+  });
+
   it('leva um 400 da API de volta para o campo certo', async () => {
     server.use(
       api.post('/transactions', () =>
@@ -120,7 +165,7 @@ describe('NewTransactionDialog', () => {
     await u.click(screen.getByRole('button', { name: 'Criar transação' }));
 
     await waitFor(() =>
-      expect(screen.getByLabelText('Valor (R$)')).toHaveAccessibleDescription(
+      expect(screen.getByLabelText('Valor')).toHaveAccessibleDescription(
         'valor excede o limite suportado',
       ),
     );

@@ -7,7 +7,7 @@ import {
 } from '@challenge/contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
-import { useId } from 'react';
+import { useId, type FocusEvent } from 'react';
 import { Controller, useForm, type FieldPath } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -17,6 +17,8 @@ import { Label } from '@/components/ui/label';
 import { ApiError } from '@/lib/api-client';
 import { shortId } from '@/lib/transaction-labels';
 
+import { normalizeAccountId } from './account-id';
+import { AmountInput } from './amount-input';
 import { GenerateUuidButton } from './generate-uuid-button';
 import { useTransactionTypes } from './hooks';
 import { TransferTypePicker } from './transfer-type-picker';
@@ -95,6 +97,21 @@ export function NewTransactionForm({
   const describedBy = (field: FieldPath<CreateTransactionInput>) =>
     errors[field] === undefined ? undefined : hintId(field);
 
+  /** Normaliza para validar (setValueAs) e, ao sair do campo, tambem para o que fica na tela. */
+  const accountField = (field: 'accountExternalIdDebit' | 'accountExternalIdCredit') => {
+    const registered = register(field, { setValueAs: normalizeAccountId });
+    return {
+      ...registered,
+      onBlur: (event: FocusEvent<HTMLInputElement>) => {
+        const normalized = normalizeAccountId(event.target.value);
+        if (typeof normalized === 'string' && normalized !== event.target.value) {
+          setValue(field, normalized);
+        }
+        void registered.onBlur(event);
+      },
+    };
+  };
+
   const fillWithUuid = (
     field: 'accountExternalIdDebit' | 'accountExternalIdCredit',
     uuid: string,
@@ -128,7 +145,7 @@ export function NewTransactionForm({
               className="h-9 pr-9 font-mono text-[13px]"
               aria-invalid={errors.accountExternalIdDebit !== undefined}
               aria-describedby={describedBy('accountExternalIdDebit')}
-              {...register('accountExternalIdDebit')}
+              {...accountField('accountExternalIdDebit')}
             />
             <GenerateUuidButton
               label="Gerar UUID da conta de origem"
@@ -152,7 +169,7 @@ export function NewTransactionForm({
               className="h-9 pr-9 font-mono text-[13px]"
               aria-invalid={errors.accountExternalIdCredit !== undefined}
               aria-describedby={describedBy('accountExternalIdCredit')}
-              {...register('accountExternalIdCredit')}
+              {...accountField('accountExternalIdCredit')}
             />
             <GenerateUuidButton
               label="Gerar UUID da conta de destino"
@@ -166,27 +183,20 @@ export function NewTransactionForm({
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={`${formId}-value`} className="text-[12.5px]">
-            Valor (R$)
+            Valor
           </Label>
-          <Input
-            id={`${formId}-value`}
-            type="text"
-            inputMode="decimal"
-            placeholder="120,00"
-            autoComplete="off"
-            className="h-9 font-mono text-[13px]"
-            aria-invalid={errors.value !== undefined}
-            aria-describedby={describedBy('value')}
-            {...register('value', {
-              // O campo aceita virgula como no mockup; vazio vira NaN, o mesmo que valueAsNumber
-              // faria, para o schema apontar o campo.
-              setValueAs: (raw: unknown) =>
-                typeof raw === 'string'
-                  ? raw.trim() === ''
-                    ? Number.NaN
-                    : Number(raw.replace(',', '.'))
-                  : raw,
-            })}
+          <Controller
+            control={control}
+            name="value"
+            render={({ field }) => (
+              <AmountInput
+                id={`${formId}-value`}
+                value={field.value}
+                onChange={field.onChange}
+                describedBy={describedBy('value')}
+                invalid={errors.value !== undefined}
+              />
+            )}
           />
           {errorHint('value')}
         </div>
