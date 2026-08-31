@@ -21,10 +21,14 @@ describe('rotulos e formatos', () => {
     expect(formatValue(1000.5)).toBe('R$ 1.000,50');
   });
 
-  it('formata datas em UTC, curta como no mockup e completa no detalhe', () => {
-    expect(formatShortDateTime('2026-08-30T12:00:00.000Z')).toBe('30/08 12:00');
+  it('formata as datas UTC da API no horario de Brasilia', () => {
+    expect(formatShortDateTime('2026-08-30T12:00:00.000Z')).toBe('30/08 09:00');
     expect(formatDateTime('2026-08-30T12:00:00.000Z')).toContain('30/08/2026');
-    expect(formatDateTime('2026-08-30T12:00:00.000Z')).toContain('12:00:00');
+    expect(formatDateTime('2026-08-30T12:00:00.000Z')).toContain('09:00:00');
+  });
+
+  it('nao depende do fuso da maquina: a virada do dia sai em Brasilia', () => {
+    expect(formatShortDateTime('2026-08-31T02:00:00.000Z')).toBe('30/08 23:00');
   });
 
   it('abrevia identificadores para toasts e resumos', () => {
