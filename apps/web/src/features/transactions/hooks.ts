@@ -13,6 +13,7 @@ import {
   transactionKeys,
 } from './api';
 import { toQueryInput, type ListState } from './filters';
+import { recentAccounts } from './recent-accounts';
 
 export function hasPendingTransaction(
   data: PaginatedTransactionsResponse | TransactionResponse | undefined,
@@ -62,6 +63,26 @@ export function useTransactionStats(pollIntervalMs: number = env.pollIntervalMs)
     queryFn: getTransactionStats,
     refetchInterval: (q) => ((q.state.data?.byStatus.PENDING ?? 0) > 0 ? pollIntervalMs : false),
   });
+}
+
+/** Pool das ultimas transacoes de onde saem as sugestoes de conta do formulario. */
+const RECENT_ACCOUNTS_QUERY = { page: 1, pageSize: 50 } as const;
+
+/**
+ * Contas usadas recentemente, por lado, derivadas da propria listagem — a unica "agenda" que o
+ * sistema tem. Cache proprio e frouxo (a lista muda pouco e o formulario nao precisa dela fresca).
+ */
+export function useRecentAccounts() {
+  const query = useQuery({
+    queryKey: transactionKeys.list(RECENT_ACCOUNTS_QUERY),
+    queryFn: () => listTransactions(RECENT_ACCOUNTS_QUERY),
+    staleTime: 30 * 1000,
+  });
+  const transactions = query.data?.data ?? [];
+  return {
+    debit: recentAccounts(transactions, 'debit'),
+    credit: recentAccounts(transactions, 'credit'),
+  };
 }
 
 export function useTransactionTypes() {

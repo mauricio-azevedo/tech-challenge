@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildTransaction, transactionTypes } from '../../../test/fixtures';
+import { buildTransaction, page, transactionTypes } from '../../../test/fixtures';
 import { api } from '../../../test/msw/api';
 import { server } from '../../../test/msw/server';
 import { renderWithQuery } from '../../../test/render';
@@ -24,8 +24,18 @@ const dialog = () => screen.getByRole('dialog', { name: 'Nova transação' });
 
 describe('NewTransactionDialog', () => {
   beforeEach(() => {
-    server.use(api.get('/transaction-types', () => api.json(transactionTypes)));
+    server.use(
+      api.get('/transaction-types', () => api.json(transactionTypes)),
+      // O formulario sugere as contas das ultimas transacoes; por padrao, nao ha nenhuma.
+      api.get('/transactions', () => api.json(page([]))),
+    );
   });
+
+  /** Valores oferecidos pelo `datalist` ligado ao campo. */
+  const suggestionsOf = (field: HTMLElement) => {
+    const list = document.getElementById(field.getAttribute('list') ?? '');
+    return [...(list?.querySelectorAll('option') ?? [])].map((option) => option.value);
+  };
 
   it('valida no cliente com as mesmas regras da API, apontando cada campo', async () => {
     const onCreated = vi.fn();
@@ -166,6 +176,27 @@ describe('NewTransactionDialog', () => {
         'conta de destino deve ser diferente da conta de origem',
       );
     });
+  });
+
+  it('sugere as contas ja usadas, cada lado com as suas', async () => {
+    server.use(
+      api.get('/transactions', () =>
+        api.json(
+          page([
+            buildTransaction({
+              accountExternalIdDebit: debit,
+              accountExternalIdCredit: credit,
+            }),
+          ]),
+        ),
+      ),
+    );
+    renderWithQuery(<NewTransactionDialog open onClose={vi.fn()} onCreated={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(suggestionsOf(screen.getByLabelText('Conta de origem'))).toEqual([debit]);
+    });
+    expect(suggestionsOf(screen.getByLabelText('Conta de destino'))).toEqual([credit]);
   });
 
   it('leva um 400 da API de volta para o campo certo', async () => {

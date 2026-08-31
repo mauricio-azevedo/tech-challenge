@@ -18,9 +18,10 @@ import { ApiError } from '@/lib/api-client';
 import { shortId } from '@/lib/transaction-labels';
 
 import { normalizeAccountId } from './account-id';
+import { AccountSuggestions } from './account-suggestions';
 import { AmountInput } from './amount-input';
 import { GenerateUuidButton } from './generate-uuid-button';
-import { useTransactionTypes } from './hooks';
+import { useRecentAccounts, useTransactionTypes } from './hooks';
 import { TransferTypePicker } from './transfer-type-picker';
 import { useCreateTransaction } from './use-create-transaction';
 
@@ -47,6 +48,7 @@ export function NewTransactionForm({
   onCreated: (transaction: TransactionResponse) => void;
 }) {
   const types = useTransactionTypes();
+  const recent = useRecentAccounts();
   const formId = useId();
   const {
     register,
@@ -143,6 +145,7 @@ export function NewTransactionForm({
               placeholder={UUID_PLACEHOLDER}
               autoComplete="off"
               className="h-9 pr-9 font-mono text-[13px]"
+              list={`${formId}-debit-recent`}
               aria-invalid={errors.accountExternalIdDebit !== undefined}
               aria-describedby={describedBy('accountExternalIdDebit')}
               {...accountField('accountExternalIdDebit')}
@@ -153,6 +156,7 @@ export function NewTransactionForm({
                 fillWithUuid('accountExternalIdDebit', uuid);
               }}
             />
+            <AccountSuggestions id={`${formId}-debit-recent`} accounts={recent.debit} />
           </div>
           {errorHint('accountExternalIdDebit')}
         </div>
@@ -167,6 +171,7 @@ export function NewTransactionForm({
               placeholder={UUID_PLACEHOLDER}
               autoComplete="off"
               className="h-9 pr-9 font-mono text-[13px]"
+              list={`${formId}-credit-recent`}
               aria-invalid={errors.accountExternalIdCredit !== undefined}
               aria-describedby={describedBy('accountExternalIdCredit')}
               {...accountField('accountExternalIdCredit')}
@@ -177,6 +182,7 @@ export function NewTransactionForm({
                 fillWithUuid('accountExternalIdCredit', uuid);
               }}
             />
+            <AccountSuggestions id={`${formId}-credit-recent`} accounts={recent.credit} />
           </div>
           {errorHint('accountExternalIdCredit')}
         </div>
