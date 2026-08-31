@@ -41,6 +41,14 @@ describe('createTransactionSchema', () => {
     expect(createTransactionSchema.safeParse({ ...validInput, value }).success).toBe(true);
   });
 
+  it('rejeita transferencia para a mesma conta, apontando o destino', () => {
+    expect(
+      messagesByPath({ ...validInput, accountExternalIdCredit: validInput.accountExternalIdDebit }),
+    ).toEqual({
+      accountExternalIdCredit: 'conta de destino deve ser diferente da conta de origem',
+    });
+  });
+
   it('exige tipo de transferencia inteiro e positivo', () => {
     expect(messagesByPath({ ...validInput, transferTypeId: 0 })).toEqual({
       transferTypeId: 'tipo de transferencia e obrigatorio',

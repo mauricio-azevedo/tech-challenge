@@ -150,6 +150,24 @@ describe('NewTransactionDialog', () => {
     });
   });
 
+  it('impede transferencia para a mesma conta sem chamar a API', async () => {
+    const u = user();
+    renderWithQuery(<NewTransactionDialog open onClose={vi.fn()} onCreated={vi.fn()} />);
+
+    await u.type(screen.getByLabelText('Conta de origem'), debit);
+    await u.type(screen.getByLabelText('Conta de destino'), debit);
+    await u.click(await screen.findByRole('radio', { name: 'PIX' }));
+    await u.type(screen.getByLabelText('Valor'), '12050');
+    await u.click(screen.getByRole('button', { name: 'Criar transação' }));
+
+    // Sem handler de POST no MSW: se o formulario tivesse enviado, o teste falharia na requisicao.
+    await waitFor(() => {
+      expect(screen.getByLabelText('Conta de destino')).toHaveAccessibleDescription(
+        'conta de destino deve ser diferente da conta de origem',
+      );
+    });
+  });
+
   it('leva um 400 da API de volta para o campo certo', async () => {
     server.use(
       api.post('/transactions', () =>
