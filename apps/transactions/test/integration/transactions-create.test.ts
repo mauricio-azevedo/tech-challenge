@@ -117,6 +117,21 @@ describe('POST /transactions', () => {
     expect(await testApp.prisma.transaction.count()).toBe(0);
   });
 
+  it('responde 400 para transferencia entre a mesma conta, sem gravar nada', async () => {
+    const response = await api()
+      .post('/transactions')
+      .send({ ...validBody, accountExternalIdCredit: validBody.accountExternalIdDebit });
+
+    expect(response.status).toBe(400);
+    expect((response.body as ApiErrorResponse).errors).toEqual([
+      {
+        path: 'accountExternalIdCredit',
+        message: 'conta de destino deve ser diferente da conta de origem',
+      },
+    ]);
+    expect(await testApp.prisma.transaction.count()).toBe(0);
+  });
+
   it('responde 422 para tipo de transferencia inexistente', async () => {
     const response = await api()
       .post('/transactions')
