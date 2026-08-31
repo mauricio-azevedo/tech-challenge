@@ -9,22 +9,26 @@ export const statusLabels: Record<TransactionStatus, string> = {
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// A API guarda e devolve UTC; a tela e brasileira (o locale ja e fixo em pt-BR), entao as datas
+// aparecem no horario de Brasilia — em UTC apareciam tres horas adiantadas.
+const timeZone = 'America/Sao_Paulo';
+
 const dateTime = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
   timeStyle: 'medium',
-  timeZone: 'UTC',
+  timeZone,
 });
 
-// dd/MM e HH:mm separados: o pt-BR poe virgula entre data e hora, e o mockup nao ("30/08 12:00").
+// dd/MM e HH:mm separados: o pt-BR poe virgula entre data e hora, e o mockup nao ("30/08 09:00").
 const shortDate = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
   month: '2-digit',
-  timeZone: 'UTC',
+  timeZone,
 });
 const shortTime = new Intl.DateTimeFormat('pt-BR', {
   hour: '2-digit',
   minute: '2-digit',
-  timeZone: 'UTC',
+  timeZone,
 });
 
 export function formatValue(value: number): string {

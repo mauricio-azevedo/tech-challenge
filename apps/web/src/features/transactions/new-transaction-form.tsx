@@ -8,7 +8,7 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { useId } from 'react';
-import { Controller, useForm, useWatch, type FieldPath } from 'react-hook-form';
+import { Controller, useForm, type FieldPath } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -16,12 +16,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ApiError } from '@/lib/api-client';
 import { shortId } from '@/lib/transaction-labels';
-import { cn } from '@/lib/utils';
 
+import { GenerateUuidButton } from './generate-uuid-button';
 import { useTransactionTypes } from './hooks';
 import { TransferTypePicker } from './transfer-type-picker';
 import { useCreateTransaction } from './use-create-transaction';
-import { ValueRuleHint } from './value-rule-hint';
 
 const FIELDS: FieldPath<CreateTransactionInput>[] = [
   'accountExternalIdDebit',
@@ -35,8 +34,8 @@ const UUID_PLACEHOLDER = '00000000-0000-0000-0000-000000000000';
 /**
  * O formulario valida com o **mesmo schema** que a API (`createTransactionSchema`): o que a tela
  * aceita, o backend aceita. Um 400 da API (que nao deveria acontecer) ainda assim volta para o
- * campo certo via `fieldErrors`. Cada campo tem um unico no de dica, que vira a mensagem de erro
- * quando ha uma — e e so para ele que o aria-describedby aponta.
+ * campo certo via `fieldErrors`. A unica dica de um campo e a mensagem de erro: quando nao ha
+ * erro, nao ha no de dica nem `aria-describedby`.
  */
 export function NewTransactionForm({
   onCancel,
@@ -52,6 +51,7 @@ export function NewTransactionForm({
     control,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors },
   } = useForm<CreateTransactionInput>({
     resolver: zodResolver(createTransactionSchema),
@@ -82,22 +82,25 @@ export function NewTransactionForm({
 
   const hintId = (field: FieldPath<CreateTransactionInput>) => `${formId}-${field}-hint`;
 
-  const hint = (field: FieldPath<CreateTransactionInput>, fallback: string) => {
+  const errorHint = (field: FieldPath<CreateTransactionInput>) => {
     const message = errors[field]?.message;
+    if (message === undefined) return undefined;
     return (
-      <p
-        id={hintId(field)}
-        className={cn(
-          'text-[11.5px]',
-          message === undefined ? 'text-zinc-400' : 'text-status-rejected-fg',
-        )}
-      >
-        {message ?? fallback}
+      <p id={hintId(field)} className="text-[11.5px] text-status-rejected-fg">
+        {message}
       </p>
     );
   };
 
-  const watchedValue: number | undefined = useWatch({ control, name: 'value' });
+  const describedBy = (field: FieldPath<CreateTransactionInput>) =>
+    errors[field] === undefined ? undefined : hintId(field);
+
+  const fillWithUuid = (
+    field: 'accountExternalIdDebit' | 'accountExternalIdCredit',
+    uuid: string,
+  ) => {
+    setValue(field, uuid, { shouldValidate: true });
+  };
 
   const generalError =
     create.isError &&
@@ -117,32 +120,48 @@ export function NewTransactionForm({
           <Label htmlFor={`${formId}-debit`} className="text-[12.5px]">
             Conta de origem
           </Label>
-          <Input
-            id={`${formId}-debit`}
-            placeholder={UUID_PLACEHOLDER}
-            autoComplete="off"
-            className="h-9 font-mono text-[13px]"
-            aria-invalid={errors.accountExternalIdDebit !== undefined}
-            aria-describedby={hintId('accountExternalIdDebit')}
-            {...register('accountExternalIdDebit')}
-          />
-          {hint('accountExternalIdDebit', 'Identificador da conta que será debitada')}
+          <div className="relative">
+            <Input
+              id={`${formId}-debit`}
+              placeholder={UUID_PLACEHOLDER}
+              autoComplete="off"
+              className="h-9 pr-9 font-mono text-[13px]"
+              aria-invalid={errors.accountExternalIdDebit !== undefined}
+              aria-describedby={describedBy('accountExternalIdDebit')}
+              {...register('accountExternalIdDebit')}
+            />
+            <GenerateUuidButton
+              label="Gerar UUID da conta de origem"
+              onGenerate={(uuid) => {
+                fillWithUuid('accountExternalIdDebit', uuid);
+              }}
+            />
+          </div>
+          {errorHint('accountExternalIdDebit')}
         </div>
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={`${formId}-credit`} className="text-[12.5px]">
             Conta de destino
           </Label>
-          <Input
-            id={`${formId}-credit`}
-            placeholder={UUID_PLACEHOLDER}
-            autoComplete="off"
-            className="h-9 font-mono text-[13px]"
-            aria-invalid={errors.accountExternalIdCredit !== undefined}
-            aria-describedby={hintId('accountExternalIdCredit')}
-            {...register('accountExternalIdCredit')}
-          />
-          {hint('accountExternalIdCredit', 'Identificador da conta que receberá o valor')}
+          <div className="relative">
+            <Input
+              id={`${formId}-credit`}
+              placeholder={UUID_PLACEHOLDER}
+              autoComplete="off"
+              className="h-9 pr-9 font-mono text-[13px]"
+              aria-invalid={errors.accountExternalIdCredit !== undefined}
+              aria-describedby={describedBy('accountExternalIdCredit')}
+              {...register('accountExternalIdCredit')}
+            />
+            <GenerateUuidButton
+              label="Gerar UUID da conta de destino"
+              onGenerate={(uuid) => {
+                fillWithUuid('accountExternalIdCredit', uuid);
+              }}
+            />
+          </div>
+          {errorHint('accountExternalIdCredit')}
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -157,7 +176,7 @@ export function NewTransactionForm({
             autoComplete="off"
             className="h-9 font-mono text-[13px]"
             aria-invalid={errors.value !== undefined}
-            aria-describedby={hintId('value')}
+            aria-describedby={describedBy('value')}
             {...register('value', {
               // O campo aceita virgula como no mockup; vazio vira NaN, o mesmo que valueAsNumber
               // faria, para o schema apontar o campo.
@@ -169,7 +188,7 @@ export function NewTransactionForm({
                   : raw,
             })}
           />
-          {hint('value', 'Maior que zero')}
+          {errorHint('value')}
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -185,21 +204,13 @@ export function NewTransactionForm({
                 value={field.value}
                 onChange={field.onChange}
                 labelId={`${formId}-type-label`}
-                hintId={errors.transferTypeId === undefined ? undefined : hintId('transferTypeId')}
+                hintId={describedBy('transferTypeId')}
                 invalid={errors.transferTypeId !== undefined}
               />
             )}
           />
-          {errors.transferTypeId !== undefined && hint('transferTypeId', '')}
+          {errorHint('transferTypeId')}
         </div>
-
-        <ValueRuleHint
-          value={
-            typeof watchedValue === 'number' && !Number.isNaN(watchedValue)
-              ? watchedValue
-              : undefined
-          }
-        />
 
         {generalError !== undefined && (
           <p

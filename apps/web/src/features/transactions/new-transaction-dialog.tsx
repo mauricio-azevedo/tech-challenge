@@ -35,7 +35,7 @@ export function NewTransactionDialog({
             Nova transação
           </DialogTitle>
           <DialogDescription className="text-[13px] text-pretty">
-            A transação entra como pendente e é liberada assim que a análise de segurança terminar.
+            A transação é liberada após passar pela análise de segurança.
           </DialogDescription>
         </DialogHeader>
         <NewTransactionForm onCancel={onClose} onCreated={onCreated} />

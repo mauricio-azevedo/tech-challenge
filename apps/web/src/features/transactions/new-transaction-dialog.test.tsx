@@ -32,6 +32,9 @@ describe('NewTransactionDialog', () => {
     const u = user();
     renderWithQuery(<NewTransactionDialog open onClose={vi.fn()} onCreated={onCreated} />);
 
+    // Campo sem erro nao tem legenda nem descricao: o unico no de dica e a mensagem de erro.
+    expect(screen.getByLabelText('Conta de destino')).toHaveAccessibleDescription('');
+
     await u.type(screen.getByLabelText('Conta de origem'), 'nao-e-uuid');
     await u.type(screen.getByLabelText('Valor (R$)'), '0');
     await u.click(screen.getByRole('button', { name: 'Criar transação' }));
@@ -44,6 +47,30 @@ describe('NewTransactionDialog', () => {
     );
     expect(screen.getByLabelText('Tipo de transferência')).toBeInvalid();
     expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  it('gera um UUID em cada campo de conta e revalida o campo', async () => {
+    const u = user();
+    renderWithQuery(<NewTransactionDialog open onClose={vi.fn()} onCreated={vi.fn()} />);
+
+    await u.type(screen.getByLabelText('Conta de origem'), 'nao-e-uuid');
+    await u.click(screen.getByRole('button', { name: 'Criar transação' }));
+    await waitFor(() => {
+      expect(screen.getByLabelText('Conta de origem')).toBeInvalid();
+    });
+
+    await u.click(screen.getByRole('button', { name: 'Gerar UUID da conta de origem' }));
+    await u.click(screen.getByRole('button', { name: 'Gerar UUID da conta de destino' }));
+
+    const origem = screen.getByLabelText<HTMLInputElement>('Conta de origem');
+    const destino = screen.getByLabelText<HTMLInputElement>('Conta de destino');
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    await waitFor(() => {
+      expect(origem.value).toMatch(uuid);
+    });
+    expect(destino.value).toMatch(uuid);
+    expect(origem.value).not.toBe(destino.value);
+    expect(origem).toBeValid();
   });
 
   it('cria a transacao, toasta e avisa quem abriu o dialog', async () => {

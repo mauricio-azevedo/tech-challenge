@@ -18,31 +18,3 @@ export function verdictReason(
     ? `Valor dentro do limite de ${formatValue(limit)}`
     : `Valor acima do limite de ${formatValue(limit)}`;
 }
-
-export interface RuleHint {
-  text: string;
-  aboveLimit: boolean;
-}
-
-/** Aviso da caixa de regra do formulario, reagindo ao valor digitado. */
-export function ruleHint(
-  value: number | undefined,
-  limit: number = env.antiFraudValueLimit,
-): RuleHint {
-  if (value === undefined || Number.isNaN(value) || value <= 0) {
-    return {
-      text: `Transações acima de ${formatValue(limit)} são recusadas na análise de segurança.`,
-      aboveLimit: false,
-    };
-  }
-  if (value > limit) {
-    return {
-      text: `${formatValue(value)} passa do limite de ${formatValue(limit)} e deve ser recusada na análise.`,
-      aboveLimit: true,
-    };
-  }
-  return {
-    text: `${formatValue(value)} está dentro do limite de ${formatValue(limit)}.`,
-    aboveLimit: false,
-  };
-}
