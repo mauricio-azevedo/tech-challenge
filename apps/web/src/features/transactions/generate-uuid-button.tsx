@@ -22,7 +22,10 @@ export function GenerateUuidButton({
       size="icon-sm"
       aria-label={label}
       title={label}
-      className="absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+      // Centrado por `top-1` (campo h-9, botao size-7) e nao por -translate-y-1/2: o `translate-y-px`
+      // do estado :active do Button sobrescreveria a translacao e o botao pularia meia altura para
+      // baixo no clique — bizarro de ver e, pior, o ponteiro saia de cima dele e o clique nem contava.
+      className="absolute top-1 right-1 text-muted-foreground hover:text-foreground"
       onClick={() => {
         onGenerate(crypto.randomUUID());
       }}
