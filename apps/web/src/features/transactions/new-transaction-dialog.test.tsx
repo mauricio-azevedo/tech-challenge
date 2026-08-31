@@ -32,6 +32,9 @@ describe('NewTransactionDialog', () => {
     const u = user();
     renderWithQuery(<NewTransactionDialog open onClose={vi.fn()} onCreated={onCreated} />);
 
+    // Campo sem erro nao tem legenda nem descricao: o unico no de dica e a mensagem de erro.
+    expect(screen.getByLabelText('Conta de destino')).toHaveAccessibleDescription('');
+
     await u.type(screen.getByLabelText('Conta de origem'), 'nao-e-uuid');
     await u.type(screen.getByLabelText('Valor (R$)'), '0');
     await u.click(screen.getByRole('button', { name: 'Criar transação' }));
