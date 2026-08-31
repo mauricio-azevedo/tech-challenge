@@ -8,18 +8,16 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useId, type FocusEvent } from 'react';
+import { useId } from 'react';
 import { Controller, useForm, type FieldPath } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ApiError } from '@/lib/api-client';
 import { shortId } from '@/lib/transaction-labels';
 
-import { normalizeAccountId } from './account-id';
-import { AccountSuggestions } from './account-suggestions';
+import { AccountCombobox } from './account-combobox';
 import { AmountInput } from './amount-input';
 import { GenerateUuidButton } from './generate-uuid-button';
 import { useRecentAccounts, useTransactionTypes } from './hooks';
@@ -54,7 +52,6 @@ export function NewTransactionForm({
   const recent = useRecentAccounts();
   const formId = useId();
   const {
-    register,
     control,
     handleSubmit,
     setError,
@@ -109,21 +106,6 @@ export function NewTransactionForm({
   const describedBy = (field: FieldPath<CreateTransactionInput>) =>
     errors[field] === undefined ? undefined : hintId(field);
 
-  /** Normaliza para validar (setValueAs) e, ao sair do campo, tambem para o que fica na tela. */
-  const accountField = (field: 'accountExternalIdDebit' | 'accountExternalIdCredit') => {
-    const registered = register(field, { setValueAs: normalizeAccountId });
-    return {
-      ...registered,
-      onBlur: (event: FocusEvent<HTMLInputElement>) => {
-        const normalized = normalizeAccountId(event.target.value);
-        if (typeof normalized === 'string' && normalized !== event.target.value) {
-          setValue(field, normalized);
-        }
-        void registered.onBlur(event);
-      },
-    };
-  };
-
   const fillWithUuid = (
     field: 'accountExternalIdDebit' | 'accountExternalIdCredit',
     uuid: string,
@@ -149,25 +131,30 @@ export function NewTransactionForm({
           <Label htmlFor={`${formId}-debit`} className="text-[12.5px]">
             Conta de origem
           </Label>
-          <div className="relative">
-            <Input
-              id={`${formId}-debit`}
-              placeholder={UUID_PLACEHOLDER}
-              autoComplete="off"
-              className="h-9 pr-9 font-mono text-[13px]"
-              list={`${formId}-debit-recent`}
-              aria-invalid={errors.accountExternalIdDebit !== undefined}
-              aria-describedby={describedBy('accountExternalIdDebit')}
-              {...accountField('accountExternalIdDebit')}
-            />
-            <GenerateUuidButton
-              label="Gerar UUID da conta de origem"
-              onGenerate={(uuid) => {
-                fillWithUuid('accountExternalIdDebit', uuid);
-              }}
-            />
-            <AccountSuggestions id={`${formId}-debit-recent`} accounts={recent.debit} />
-          </div>
+          <Controller
+            control={control}
+            name="accountExternalIdDebit"
+            render={({ field }) => (
+              <AccountCombobox
+                id={`${formId}-debit`}
+                value={field.value}
+                accounts={recent.debit}
+                placeholder={UUID_PLACEHOLDER}
+                describedBy={describedBy('accountExternalIdDebit')}
+                invalid={errors.accountExternalIdDebit !== undefined}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                suffix={
+                  <GenerateUuidButton
+                    label="Gerar UUID da conta de origem"
+                    onGenerate={(uuid) => {
+                      fillWithUuid('accountExternalIdDebit', uuid);
+                    }}
+                  />
+                }
+              />
+            )}
+          />
           {errorHint('accountExternalIdDebit')}
         </div>
 
@@ -175,25 +162,30 @@ export function NewTransactionForm({
           <Label htmlFor={`${formId}-credit`} className="text-[12.5px]">
             Conta de destino
           </Label>
-          <div className="relative">
-            <Input
-              id={`${formId}-credit`}
-              placeholder={UUID_PLACEHOLDER}
-              autoComplete="off"
-              className="h-9 pr-9 font-mono text-[13px]"
-              list={`${formId}-credit-recent`}
-              aria-invalid={errors.accountExternalIdCredit !== undefined}
-              aria-describedby={describedBy('accountExternalIdCredit')}
-              {...accountField('accountExternalIdCredit')}
-            />
-            <GenerateUuidButton
-              label="Gerar UUID da conta de destino"
-              onGenerate={(uuid) => {
-                fillWithUuid('accountExternalIdCredit', uuid);
-              }}
-            />
-            <AccountSuggestions id={`${formId}-credit-recent`} accounts={recent.credit} />
-          </div>
+          <Controller
+            control={control}
+            name="accountExternalIdCredit"
+            render={({ field }) => (
+              <AccountCombobox
+                id={`${formId}-credit`}
+                value={field.value}
+                accounts={recent.credit}
+                placeholder={UUID_PLACEHOLDER}
+                describedBy={describedBy('accountExternalIdCredit')}
+                invalid={errors.accountExternalIdCredit !== undefined}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                suffix={
+                  <GenerateUuidButton
+                    label="Gerar UUID da conta de destino"
+                    onGenerate={(uuid) => {
+                      fillWithUuid('accountExternalIdCredit', uuid);
+                    }}
+                  />
+                }
+              />
+            )}
+          />
           {errorHint('accountExternalIdCredit')}
         </div>
 

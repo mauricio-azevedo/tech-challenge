@@ -9,8 +9,9 @@ describe('normalizeAccountId', () => {
     );
   });
 
-  it('deixa passar o que nao e texto, para o schema dar a mensagem', () => {
-    expect(normalizeAccountId(undefined)).toBeUndefined();
-    expect(normalizeAccountId(42)).toBe(42);
+  it('nao mexe no que ja esta normalizado', () => {
+    expect(normalizeAccountId('3f2b1d3e-8c4a-4f6e-9a1b-2c3d4e5f6a7b')).toBe(
+      '3f2b1d3e-8c4a-4f6e-9a1b-2c3d4e5f6a7b',
+    );
   });
 });
