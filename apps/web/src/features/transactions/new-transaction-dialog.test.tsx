@@ -40,11 +40,8 @@ describe('NewTransactionDialog', () => {
     );
   });
 
-  /** Valores oferecidos pelo `datalist` ligado ao campo. */
-  const suggestionsOf = (field: HTMLElement) => {
-    const list = document.getElementById(field.getAttribute('list') ?? '');
-    return [...(list?.querySelectorAll('option') ?? [])].map((option) => option.value);
-  };
+  /** Contas oferecidas pela lista aberta do campo. */
+  const suggestions = () => screen.queryAllByRole('option').map((option) => option.textContent);
 
   it('valida no cliente com as mesmas regras da API, apontando cada campo', async () => {
     const onCreated = vi.fn();
@@ -192,7 +189,7 @@ describe('NewTransactionDialog', () => {
     });
   });
 
-  it('sugere as contas ja usadas, cada lado com as suas', async () => {
+  it('abre as contas ja usadas ao focar o campo, cada lado com as suas', async () => {
     server.use(
       api.get('/transactions', () =>
         api.json(
@@ -205,12 +202,82 @@ describe('NewTransactionDialog', () => {
         ),
       ),
     );
+    const u = user();
     renderWithQuery(<NewTransactionDialog open onClose={vi.fn()} onCreated={vi.fn()} />);
 
+    await u.click(screen.getByLabelText('Conta de origem'));
     await waitFor(() => {
-      expect(suggestionsOf(screen.getByLabelText('Conta de origem'))).toEqual([debit]);
+      expect(suggestions()).toEqual([expect.stringContaining(debit)]);
     });
-    expect(suggestionsOf(screen.getByLabelText('Conta de destino'))).toEqual([credit]);
+
+    await u.click(screen.getByLabelText('Conta de destino'));
+    await waitFor(() => {
+      expect(suggestions()).toEqual([expect.stringContaining(credit)]);
+    });
+  });
+
+  it('escolhe uma conta da lista pelo teclado, sem enviar o formulario', async () => {
+    server.use(
+      api.get('/transactions', () =>
+        api.json(page([buildTransaction({ accountExternalIdDebit: debit })])),
+      ),
+      // Sem handler de POST: se o Enter enviasse o formulario, o teste falharia na requisicao.
+    );
+    const u = user();
+    renderWithQuery(<NewTransactionDialog open onClose={vi.fn()} onCreated={vi.fn()} />);
+
+    const origem = screen.getByLabelText<HTMLInputElement>('Conta de origem');
+    await u.click(origem);
+    await waitFor(() => {
+      expect(suggestions()).toHaveLength(1);
+    });
+    await u.keyboard('{ArrowDown}{Enter}');
+
+    expect(origem).toHaveValue(debit);
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+  });
+
+  it('filtra a lista pelo que esta digitado e a fecha quando nada casa', async () => {
+    server.use(
+      api.get('/transactions', () =>
+        api.json(page([buildTransaction({ accountExternalIdDebit: debit })])),
+      ),
+    );
+    const u = user();
+    renderWithQuery(<NewTransactionDialog open onClose={vi.fn()} onCreated={vi.fn()} />);
+
+    const origem = screen.getByLabelText('Conta de origem');
+    await u.type(origem, debit.slice(0, 4));
+    await waitFor(() => {
+      expect(suggestions()).toHaveLength(1);
+    });
+
+    await u.type(origem, 'ffff');
+    await waitFor(() => {
+      expect(screen.queryAllByRole('option')).toHaveLength(0);
+    });
+  });
+
+  it('Esc fecha a lista de contas, e nao o dialog', async () => {
+    server.use(
+      api.get('/transactions', () =>
+        api.json(page([buildTransaction({ accountExternalIdDebit: debit })])),
+      ),
+    );
+    const onClose = vi.fn();
+    const u = user();
+    renderWithQuery(<NewTransactionDialog open onClose={onClose} onCreated={vi.fn()} />);
+
+    await u.click(screen.getByLabelText('Conta de origem'));
+    await waitFor(() => {
+      expect(suggestions()).toHaveLength(1);
+    });
+
+    await u.keyboard('{Escape}');
+
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(dialog()).toBeInTheDocument();
   });
 
   it('leva um 400 da API de volta para o campo certo', async () => {
