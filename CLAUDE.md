@@ -121,7 +121,7 @@ Um problema encontrado depois do merge vira um PR `fix/` próprio, com a causa n
 
 ## Versões fixadas — e por quê
 
-| Peça       | Versão                | Motivo (detalhes em `DECISIONS.md`)                                            |
+| Peça       | Versão                | Motivo                                                                         |
 | ---------- | --------------------- | ------------------------------------------------------------------------------ |
 | Node       | 22.23 (`.nvmrc`)      | mínimo de `lint-staged@17` e `@nestjs/schematics@12`                           |
 | pnpm       | 11 (`packageManager`) | configuração só em `pnpm-workspace.yaml`; `minimumReleaseAge` de 1 dia ativo   |
